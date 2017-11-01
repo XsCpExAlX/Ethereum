@@ -1,6 +1,6 @@
 from befh.restful_api_socket import RESTfulApiSocket
 from befh.ws_api_socket import WebSocketApiClient
-from befh.market_data import L2Depth, Trade
+from market_data import L2Depth, Trade
 from befh.exchange import ExchangeGateway
 from befh.instrument import Instrument
 from befh.sql_client_template import SqlClientTemplate
@@ -289,8 +289,8 @@ class ExchGwGdax(ExchangeGateway):
 
 if __name__ == '__main__':
     exchange_name = 'Gdax'
-    instmt_name = 'BTCUSD'
-    instmt_code = 'BTC-USD'
+    instmt_name = 'ETHUSD'
+    instmt_code = 'ETH-USD'
     instmt = Instrument(exchange_name, instmt_name, instmt_code)
     db_client = SqlClientTemplate()
     Logger.init_log()

@@ -104,8 +104,18 @@ def parseData(readData, outData):
     # export the averages to .CSV
     df1.to_csv(outData,index=False)
 
+def parseData1(readData, outData):
+    df = pd.read_csv(readData)
+
+    ### sort by date just in case the data isn't
+    df['trades_date_time']=pd.to_datetime(df.trades_date_time,format='%Y%m%d %H:%M:%S.%f')
+    df.to_csv(outData, index=False)
 
 if __name__ == "__main__":
-    readData = 'C:/Users/Joe/Documents/workspace/exch_gdax_btcusd_snapshot_20170906.csv'
-    outData = 'C:/Users/Joe/Documents/workspace/predictions1_bitcoin.csv'
-    parseData(readData, outData)
+#     readData = 'C:/Users/Joe/Documents/workspace/exch_gdax_btcusd_snapshot_20170906.csv'
+#     outData = 'C:/Users/Joe/Documents/workspace/predictions1_bitcoin.csv'
+#     parseData(readData, outData)
+
+    readData = 'C:\\Users\\Joseph\\Documents\\ETHUSD_backtrader.csv'
+    outData = 'C:\\Users\\Joseph\\Documents\\ETHUSD_backtrader1.csv'
+    parseData1(readData, outData)
