@@ -141,7 +141,7 @@ if __name__ == '__main__':
     #cerebro._dopreload(data)
 
     #data1 = bt.feeds.CCXT(exchange='gdax', symbol='BTC/USD', timeframe=bt.TimeFrame.Ticks, compression=1)
-    data1 = bt.feeds.CCXT(exchange='gdax', symbol='ETH/USD', timeframe=4, compression=1)
+    data1 = bt.feeds.CCXT(exchange='gdax', symbol='ETH/USD', timeframe=1, compression=1)
     cerebro.adddata(data1)
 
     datetime=0,

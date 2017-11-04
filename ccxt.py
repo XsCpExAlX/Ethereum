@@ -23,16 +23,17 @@ class CCXT(DataBase):
         sleep(self.exchange.rateLimit / 1000) # time.sleep wants seconds
         if self.last_trade_id is None:
             # first time get the latest trade only
+            self.last_trade_id = 1
             trades = [self.exchange.fetch_trades(self.symbol)[-1]]
         else:
             trades = self.exchange.fetch_trades(self.symbol)    
             
         for trade in trades:
-            trade_id = trade['trade_id']
+            trade_id = trade['info']['trade_id']
 
             if trade_id > self.last_trade_id:
-                trade_time = datetime.strptime(trade['time'], '%Y-%m-%dT%H:%M:%S.%fZ')
-                self.trades.append((trade_time, float(trade['price']), float(trade['size'])))
+                trade_time = datetime.strptime(trade['info']['time'], '%Y-%m-%dT%H:%M:%S.%fZ')
+                self.trades.append((trade_time, float(trade['info']['price']), float(trade['info']['size'])))
                 self.last_trade = trade_id
 
         try:
