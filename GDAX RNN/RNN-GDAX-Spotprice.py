@@ -12,7 +12,6 @@ import tensorflow as tf
 import pandas as pd 
 import numpy as np
 import matplotlib.pyplot as plt
-get_ipython().run_line_magic('matplotlib', 'inline')
 
 
 # ## Read data
@@ -20,15 +19,19 @@ get_ipython().run_line_magic('matplotlib', 'inline')
 # In[2]:
 
 
-dataset = pd.read_csv('BTCUSD_TechnicalIndicators.csv', nrows=5000)
-dataset.tail(2)
+dataset = pd.read_csv('C:/Users/donut/Documents/GitHub/Ethereum/data/BTCUSD_TechnicalIndicators.csv', nrows=5000)
+
+# Drop first five rows of data because for some reason prices are 0.00
+dataset = dataset.drop(dataset.index[0:5])
+print(dataset.head(10))
 
 
 # In[3]:
 
 
-spotdata = pd.read_csv('BTCUSD_SPOT.csv', nrows=200)
-spotdata.tail(2) 
+spotdata = pd.read_csv('C:/Users/donut/Documents/GitHub/Ethereum/data/BTCUSD_SPOT.csv', nrows=5000)
+print(spotdata.head(10))
+
 
 
 # #### Normalize
@@ -56,7 +59,7 @@ spotdataNorm.head(3)
 # In[6]:
 
 
-num_epochs = 100
+num_epochs = 20
 
 batch_size = 1
 
@@ -124,7 +127,7 @@ yTrain = datasetTrain['PriceTarget'].as_matrix()
 # In[12]:
 
 
-print(xTrain[0:3],'\n',yTrain[0:3])
+# print(xTrain[0:3],'\n',yTrain[0:3])
 
 
 # In[13]:
@@ -138,7 +141,7 @@ yTest = datasetTest['PriceTarget'].as_matrix()
 # In[14]:
 
 
-print(xTest[0:3],'\n',yTest[0:3])
+# print(xTest[0:3],'\n',yTest[0:3])
 
 
 # ## Visualize starting price data
@@ -146,14 +149,14 @@ print(xTest[0:3],'\n',yTest[0:3])
 # In[15]:
 
 
-plt.figure(figsize=(25,5))
-plt.plot(xTrain[:,0])
-plt.title('Train (' +str(len(xTrain))+' data points)')
-plt.show()
-plt.figure(figsize=(10,3))
-plt.plot(xTest[:,0])
-plt.title('Test (' +str(len(xTest))+' data points)')
-plt.show()
+# plt.figure(figsize=(25,5))
+# plt.plot(xTrain[:,0])
+# plt.title('Train (' +str(len(xTrain))+' data points)')
+# plt.show()
+# plt.figure(figsize=(10,3))
+# plt.plot(xTest[:,0])
+# plt.title('Test (' +str(len(xTest))+' data points)')
+# plt.show()
 
 
 # ## Placeholders
@@ -252,36 +255,36 @@ with tf.Session() as sess:
     tf.global_variables_initializer().run()
     
     for epoch_idx in range(num_epochs):
-                
-        print('Epoch %d' %epoch_idx)
-        
-        for batch_idx in range(num_batches):
-            start_idx = batch_idx * truncated_backprop_length
-            end_idx = start_idx + truncated_backprop_length * batch_size
-        
-            
-            batchX = xTrain[start_idx:end_idx,:].reshape(batch_size,truncated_backprop_length,num_features)
-            batchY = yTrain[start_idx:end_idx].reshape(batch_size,truncated_backprop_length,1)
-                
-            #print('IDXs',start_idx,end_idx)
-            #print('X',batchX.shape,batchX)
-            #print('Y',batchX.shape,batchY)
-            
-            feed = {batchX_placeholder : batchX, batchY_placeholder : batchY}
-            
-            #TRAIN!
-            _loss,_train_step,_pred,_last_label,_prediction = sess.run(
-                fetches=[loss,train_step,prediction,last_label,prediction],
-                feed_dict = feed
-            )
-            
-            loss_list.append(_loss)
-            
-           
-            
-            if(batch_idx % 200 == 0):
-                print('Step %d - Loss: %.6f' %(batch_idx,_loss))
-                
+        print('Epoch %d' % int(epoch_idx + 1))
+        try:
+            for batch_idx in range(num_batches):
+                start_idx = batch_idx * truncated_backprop_length
+                end_idx = start_idx + truncated_backprop_length * batch_size
+
+                batchX = xTrain[start_idx:end_idx, :].reshape(batch_size, truncated_backprop_length, num_features)
+                batchY = yTrain[start_idx:end_idx].reshape(batch_size, truncated_backprop_length, 1)
+
+                # print('IDXs', start_idx, end_idx)
+                # print('X', batchX.shape, batchX)
+                # print('Y', batchX.shape, batchY)
+
+                feed = {batchX_placeholder: batchX, batchY_placeholder: batchY}
+
+
+                # TRAIN!
+                _loss, _train_step, _pred, _last_label, _prediction = sess.run(
+                    fetches=[loss, train_step, prediction, last_label, prediction],
+                    feed_dict=feed)
+                loss_list.append(_loss)
+
+                if (batch_idx % 1000 == 0):
+                    print('Step %d - Loss: %.6f' % (batch_idx, _loss))
+
+
+        except ValueError:
+            print('You have reached the end of Training Epoch %d' % int(epoch_idx + 1))
+            pass
+
     #TEST
     
     
@@ -303,13 +306,11 @@ with tf.Session() as sess:
 # In[26]:
 
 
-import matplotlib.pyplot as plt
-get_ipython().run_line_magic('matplotlib', 'inline')
+
 plt.title('Loss')
 plt.scatter(x=np.arange(0,len(loss_list)),y=loss_list)
 plt.xlabel('epochs')
 plt.ylabel('loss')
-plt.show();
 
 
 # #### Denormalize
