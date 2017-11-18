@@ -23,14 +23,12 @@ dataset = pd.read_csv('C:/Users/donut/Documents/GitHub/Ethereum/data/BTCUSD_Tech
 
 # Drop first five rows of data because for some reason prices are 0.00
 dataset = dataset.drop(dataset.index[0:5])
-print(dataset.head(10))
 
 
 # In[3]:
 
 
 spotdata = pd.read_csv('C:/Users/donut/Documents/GitHub/Ethereum/data/BTCUSD_SPOT.csv', nrows=5000)
-print(spotdata.head(10))
 
 
 
@@ -42,7 +40,6 @@ print(spotdata.head(10))
 PriceRange=dataset["Price"].max() - dataset["Price"].min()
 PriceMean = dataset["Price"].mean()
 datasetNorm = (dataset - dataset.mean()) / (dataset.max() - dataset.min())
-datasetNorm.head(3)
 
 
 # In[5]:
@@ -51,7 +48,6 @@ datasetNorm.head(3)
 SpotPriceRange=spotdata["Price"].max() - spotdata["Price"].min()
 PriceMean = spotdata["Price"].mean()
 spotdataNorm = (spotdata - spotdata.mean()) / (spotdata.max() - spotdata.min())
-spotdataNorm.head(3)
 
 
 # ## Hyperparams
@@ -59,7 +55,7 @@ spotdataNorm.head(3)
 # In[6]:
 
 
-num_epochs = 20
+num_epochs = 1
 
 batch_size = 1
 
@@ -76,9 +72,9 @@ num_batches = total_series_length//batch_size//truncated_backprop_length
 
 min_test_size = 1000
 
-print('The total series length is: %d' %total_series_length)
-print('The current configuration gives us %d batches of %d observations each one looking %d steps in the past' 
-      %(num_batches,batch_size,truncated_backprop_length))
+# print('The total series length is: %d' %total_series_length)
+# print('The current configuration gives us %d batches of %d observations each one looking %d steps in the past'
+#       %(num_batches,batch_size,truncated_backprop_length))
 
 
 # ## Train-Test split
@@ -96,6 +92,8 @@ for i in range(min_test_size,len(datasetNorm.index)):
         break
 
 datasetTest =  datasetNorm[dataset.index >= test_first_idx]
+print(datasetTrain.tail(2))
+print(datasetTest.head(2))
 
 
 # In[8]:
@@ -107,13 +105,11 @@ datasetTest = spotdataNorm
 # In[9]:
 
 
-datasetTrain.head(2)
 
 
 # In[10]:
 
 
-datasetTest.head(2)
 
 
 # In[11]:
