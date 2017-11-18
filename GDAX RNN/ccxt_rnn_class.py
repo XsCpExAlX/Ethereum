@@ -65,8 +65,8 @@ class model_RNN:
         # num_epochs is already defined as part of the class
         batch_size = 1
         total_series_length = len(data_rnn.index)
-        truncated_backprop_length = 10  # The size of the sequence
-        state_size = 25  # The number of neurons
+        truncated_backprop_length = 5  # The size of the sequence
+        state_size = 10  # The number of neurons
         num_features = 4 + self.future_price_window + self.order_book_window * 6  # The number of columns to be used for xTrain analysis in RNN
         num_classes = 1  # The number of targets to be predicted
         num_batches = int(total_series_length / batch_size / truncated_backprop_length)
@@ -250,8 +250,9 @@ class model_RNN:
 
 if __name__ == '__main__':
     # Read DataFrame.csv
-    data_rnn = pd.read_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/ETHUSD2_pandas_rnn_prepared_simplified.csv', nrows=50000)
-    new_data_rnn = pd.read_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/ETHUSD2_pandas_rnn_prepared_simplified.csv', nrows=5000)
-    data_rnn_ckpt = 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/rnn_saved_models/testing1'
-    x = model_RNN(30, 1, 5, 5, num_epochs=30)
+    data_rnn = pd.read_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/ETHUSD2_pandas_rnn_prepared_simplified.csv', nrows=10000)
+    new_data_rnn = pd.read_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/ETHUSD2.csv', nrows=20000)
+    data_rnn_ckpt = 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/rnn_saved_models/testing4'
+    x = model_RNN(order_book_range=30, order_book_window=1, future_price_window=20, future_ma_window=20, num_epochs=50)
     x.train_and_predict(restore=True, data_rnn=new_data_rnn, data_rnn_ckpt=data_rnn_ckpt)
+    # x.train_and_predict(restore=False, data_rnn=data_rnn, data_rnn_ckpt=data_rnn_ckpt)
