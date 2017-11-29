@@ -2,6 +2,7 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
+import time
 import datetime  # For datetime objects
 import os.path  # To manage paths
 import sys  # To find out the script name (in argv[0])
@@ -18,6 +19,7 @@ from tensorflow.python.ops import rnn, rnn_cell
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from pickle import FALSE
 
 
 class model_RNN:
@@ -34,14 +36,9 @@ class model_RNN:
         print('Restore model? %s' % restore)
         print('nrows of raw data= %s' % len(data_rnn.index))
 
-        # Drop first few rows of data because for some reason prices are 0.00
-        data_rnn = data_rnn.drop(data_rnn.index[0:2])
-        print('nrows with dropped initial zeros= %s' % len(data_rnn.index))
-
 
         # Convert 'trades_date_time' and  'order_date_time' from object to datetime object
         data_rnn['trades_date_time'] = pd.to_datetime(data_rnn['trades_date_time'])
-        data_rnn['order_date_time'] = pd.to_datetime(data_rnn['order_date_time'])
 
         # Add any columns that are needed
         data_rnn.insert(0, 'row_num', range(len(data_rnn.index)))  # This column is used as a surrogate for the row number
@@ -61,8 +58,7 @@ class model_RNN:
         print(data_rnn.head(5))
 
         # Resample data by setting index to 'trades_date_time' to avoid repeats
-        data_rnn = data_rnn[data_rnn.columns.difference(['order_date_time'])]  # .difference() method removes any columns and automatically reorders columns alphanumerically
-        data_rnn = data_rnn.resample('S', on='trades_date_time').mean().interpolate(method='linear')
+        data_rnn = data_rnn.resample('U', on='trades_date_time').mean().interpolate(method='linear')
         print('nrows with resample = %s' % len(data_rnn.index))
 
 
@@ -72,7 +68,7 @@ class model_RNN:
         total_series_length = len(data_rnn.index)
         truncated_backprop_length = 5  # The size of the sequence
         state_size = 10  # The number of neurons
-        num_features = 4 + self.future_price_window + self.order_book_window * 6  # The number of columns to be used for xTrain analysis in RNN
+        num_features = 2 + self.future_price_window + self.order_book_window * 6  # The number of columns to be used for xTrain analysis in RNN
         num_classes = 1  # The number of targets to be predicted
         num_batches = int(total_series_length / batch_size / truncated_backprop_length)
         min_test_size = 1000
@@ -86,7 +82,7 @@ class model_RNN:
 
 
         # Pick all apporpriate columns to train and test in RNN
-        rnn_column_list = ['trade_px', 'b1', 'a1', 'spread']
+        rnn_column_list = ['trade_px', 'spread']
         for i in range(1, self.future_price_window + 1):
             rnn_column_list.append('future_price_%s' % i)
         for i in range(1, self.order_book_window + 1):
@@ -137,7 +133,7 @@ class model_RNN:
             labels_series = tf.unstack(batchY_placeholder, axis=1)  # Unpacking
 
         # Forward Pass: Unrolling the cell (input to hidden recurrent layer)
-        cell = tf.contrib.rnn.BasicRNNCell(num_units=state_size)
+        cell = tf.contrib.rnn.BasicRNNCell(num_units=state_size) # this takes forever!
         states_series, current_state = tf.nn.dynamic_rnn(cell=cell, inputs=batchX_placeholder, dtype=tf.float32)
         states_series = tf.transpose(states_series, [1, 0, 2])
 
@@ -152,6 +148,7 @@ class model_RNN:
         loss_list = []
         test_pred_list = []
 
+
         # Add saver variable to save and restore all variables from trained model
         saver = tf.train.Saver()
 
@@ -161,11 +158,13 @@ class model_RNN:
             if restore:
                 saver.restore(sess, data_rnn_ckpt)
                 print('Model restored from file: %s' % data_rnn_ckpt)
+                print(len(xTest))
                 # print('weight: %s' % weight.eval())
                 # print('bias: %s' % bias.eval())
 
                 # Predict new_test_set with previously saved model
                 for test_idx in range(len(xTest) - truncated_backprop_length):
+                    stuff=xTest[test_idx:test_idx + truncated_backprop_length, :]
                     testBatchX = xTest[test_idx:test_idx + truncated_backprop_length, :].reshape(
                         (1, truncated_backprop_length, num_features))
                     testBatchY = yTest[test_idx:test_idx + truncated_backprop_length].reshape(
@@ -252,12 +251,73 @@ class model_RNN:
             plt.legend(loc='upper left')
             plt.show()
 
+    def preloadData(self, iteration = 100, interval = 1):            
+        data = self.makeFetchDF()
+        for i in range(0, iteration):         
+            data = pd.concat([data, self.fetchGDAXdata()])
+            time.sleep(interval)
+        return data
+            
+    def fetchGDAXdata(self):
+        data = self.makeFetchDF()
 
-if __name__ == '__main__':
+        exchange = ccxt.gdax()
+        trades = exchange.fetch_trades('ETH/USD')
+        trade = trades[0]
+
+        orderbook = exchange.fetch_order_book('ETH/USD')
+        asks = orderbook['asks']
+        bids = orderbook['bids']
+
+        values = {'trade_px':trade['price'],'update_type':trade['side'],'trades_date_time':trade['timestamp']}
+        for i in range(1, self.order_book_range + 1):
+            values['a%s' % i] = asks[i][0]
+            values['aq%s' % i] = asks[i][1]
+            values['b%s' % i] = bids[i][0]
+            values['bq%s' % i] = bids[i][1]
+        
+        return data.append(values, ignore_index=True)
+
+    def makeFetchDF(self):
+        column_list = ['trade_px', 'trades_date_time', 'update_type']
+        for i in range(1, self.order_book_range + 1):
+            column_list.append('a%s' % i)
+            column_list.append('aq%s' % i)
+            column_list.append('b%s' % i)
+            column_list.append('bq%s' % i)
+
+        dataFrame = pd.DataFrame(columns=column_list)
+        return dataFrame
+
+if __name__ == '__main__': #TODO: modularize train_and_predict (take out load and rnnCELL), do loop datafetch & predictions. Fetch data by listening to websocket.
     # Read DataFrame.csv
-    data_rnn = pd.read_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/ETHUSD2_pandas_rnn_prepared_simplified.csv', nrows=10000)
-    new_data_rnn = pd.read_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/ETHUSD2.csv', nrows=20000)
-    data_rnn_ckpt = 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/rnn_saved_models/testing4'
-    x = model_RNN(order_book_range=30, order_book_window=1, future_price_window=20, future_ma_window=20, num_epochs=50)
+    #new_data_rnn = pd.read_csv('C:/Users/Joe/Documents/exch_gdax_ethusd_snapshot_20170913.csv', nrows=2000)
+    ''' some data processing done for the loaded csv file that was in train_and_predict(). I took it out here since it is not needed for livedata feeds
+    # Drop first few rows of data because for some reason prices are 0.00
+    data_rnn = data_rnn.drop(data_rnn.index[0:2])
+    print('nrows with dropped initial zeros= %s' % len(data_rnn.index))
+
+    data_rnn = data_rnn[data_rnn.columns.difference(['order_date_time'])]  # .difference() method removes any columns and automatically reorders columns alphanumerically
+    '''
+
+    data_rnn_ckpt = "rnn_saved_models\ethusd_futurema5_volume1_epoch30_nrows20000_222.ckpt"
+    x = model_RNN(order_book_range=5, order_book_window=1, future_price_window=20, future_ma_window=20, num_epochs=50)
+
+    #print("preload time %s" % datetime.datetime.now())
+    new_data_rnn = x.preloadData(450, 0.1)
+    #print("preload end %s" % time)
+    #new_data_rnn.to_csv("preload_data.csv")  # for testing. We can save the data from preload and just reuse that for testing so we don't have to wait every execution.
+    #new_data_rnn = pd.read_csv("preload_data.csv")
+    
     x.train_and_predict(restore=True, data_rnn=new_data_rnn, data_rnn_ckpt=data_rnn_ckpt)
-    # x.train_and_predict(restore=False, data_rnn=data_rnn, data_rnn_ckpt=data_rnn_ckpt)
+    '''
+    load the ckpt
+    predict
+    while True:
+       new_data_rnn.concat(fetchGDAX()) #add it to end
+       new_data_rnn.popleft() # take out the leftmost
+       predict(new_data_rnn)
+    '''
+    
+    
+    
