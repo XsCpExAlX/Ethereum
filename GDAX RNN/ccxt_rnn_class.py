@@ -30,12 +30,12 @@ class model_RNN:
         self.future_ma_window = future_ma_window
         self.num_epochs = num_epochs
 
-
-    def train_and_predict(self, restore=False, data_rnn=None, data_rnn_ckpt=None):
-        tf.reset_default_graph()
-        print('Restore model? %s' % restore)
+    class VH: #variable holder
+        truncated_backdrop_length = 0
+        num_features = 0
+        
+    def process_data(self, data_rnn, restore=False):
         print('nrows of raw data= %s' % len(data_rnn.index))
-
 
         # Convert 'trades_date_time' and  'order_date_time' from object to datetime object
         data_rnn['trades_date_time'] = pd.to_datetime(data_rnn['trades_date_time'])
@@ -61,6 +61,22 @@ class model_RNN:
         data_rnn = data_rnn.resample('U', on='trades_date_time').mean().interpolate(method='linear')
         print('nrows with resample = %s' % len(data_rnn.index))
 
+        # Normalize data
+        PriceRange = data_rnn['trade_px'].max() - data_rnn['trade_px'].min()
+        PriceMean = data_rnn['trade_px'].mean()
+        data_rnn_norm = (data_rnn - data_rnn.mean()) / (data_rnn.max() - data_rnn.min())
+        # print(data_rnn_norm.tail(3))
+
+        return PriceRange,PriceMean,data_rnn_norm
+
+    #def initializeVariables(self):
+        #truncated_backprop_length = 5  # The size of the sequence
+        #num_features = 2 + self.future_price_window + self.order_book_window * 6  # The number of columns to be used for xTrain analysis in RNN
+        #last_state, last_label, prediction
+  
+    def train_and_predict(self, restore=False, data_rnn=None, data_rnn_ckpt=None, cell=None):
+        #tf.reset_default_graph()
+        print('Restore model? %s' % restore)
 
         # RNN Hyperparams
         # num_epochs is already defined as part of the class
@@ -72,27 +88,10 @@ class model_RNN:
         num_classes = 1  # The number of targets to be predicted
         num_batches = int(total_series_length / batch_size / truncated_backprop_length)
         min_test_size = 1000
+        
+        PriceRange,PriceMean,data_rnn_norm = self.process_data(data_rnn, restore)
 
-
-        # Normalize data
-        PriceRange = data_rnn['trade_px'].max() - data_rnn['trade_px'].min()
-        PriceMean = data_rnn['trade_px'].mean()
-        data_rnn_norm = (data_rnn - data_rnn.mean()) / (data_rnn.max() - data_rnn.min())
-        # print(data_rnn_norm.tail(3))
-
-
-        # Pick all apporpriate columns to train and test in RNN
-        rnn_column_list = ['trade_px', 'spread']
-        for i in range(1, self.future_price_window + 1):
-            rnn_column_list.append('future_price_%s' % i)
-        for i in range(1, self.order_book_window + 1):
-            rnn_column_list.append('a%s' % i)
-            rnn_column_list.append('aq%s' % i)
-            rnn_column_list.append('aqq%s' % i)
-            rnn_column_list.append('b%s' % i)
-            rnn_column_list.append('bq%s' % i)
-            rnn_column_list.append('bqq%s' % i)
-
+        rnn_column_list = self.get_rnn_column_list()
 
         # RNN Placeholders
         batchX_placeholder = tf.placeholder(dtype=tf.float32, shape=[None, truncated_backprop_length, num_features],
@@ -157,27 +156,7 @@ class model_RNN:
         with tf.Session() as sess:
             if restore:
                 saver.restore(sess, data_rnn_ckpt)
-                print('Model restored from file: %s' % data_rnn_ckpt)
-                print(len(xTest))
-                # print('weight: %s' % weight.eval())
-                # print('bias: %s' % bias.eval())
-
-                # Predict new_test_set with previously saved model
-                for test_idx in range(len(xTest) - truncated_backprop_length):
-                    stuff=xTest[test_idx:test_idx + truncated_backprop_length, :]
-                    testBatchX = xTest[test_idx:test_idx + truncated_backprop_length, :].reshape(
-                        (1, truncated_backprop_length, num_features))
-                    testBatchY = yTest[test_idx:test_idx + truncated_backprop_length].reshape(
-                        (1, truncated_backprop_length, 1))
-
-                    # _current_state = np.zeros((batch_size,state_size))
-                    feed = {batchX_placeholder: testBatchX,
-                            batchY_placeholder: testBatchY}
-
-                    # Test_pred contains 'window_size' predictions, we want the last one
-                    _last_state, _last_label, test_pred = sess.run([last_state, last_label, prediction], feed_dict=feed)
-                    test_pred_list.append(test_pred[-1][0])  # The last one
-
+                test_pred_list = self.predict(sess, data_rnn_norm, num_classes, truncated_backprop_length, num_features, last_state, last_label, prediction, batchX_placeholder, batchY_placeholder)
 
             else:
                 tf.global_variables_initializer().run()
@@ -250,22 +229,68 @@ class model_RNN:
             plt.title('Price vs Predicted')
             plt.legend(loc='upper left')
             plt.show()
+    
+    def predict(self, sess, data_rnn, num_classes, truncated_backprop_length, num_features, last_state, last_label, prediction, batchX_placeholder, batchY_placeholder):
+        #truncated_backprop_length=5
+        #num_features=20
+        print('Model restored from file: %s' % data_rnn_ckpt)
+        # print('weight: %s' % weight.eval())
+        # print('bias: %s' % bias.eval())
+
+        xTest = data_rnn[self.get_rnn_column_list()].as_matrix()
+        yTest = data_rnn[['future_ma_%s' % self.future_ma_window]].as_matrix()
+
+        test_pred_list = []
+        # Predict new_test_set with previously saved model
+        for test_idx in range(len(xTest) - truncated_backprop_length):
+            testBatchX = xTest[test_idx:test_idx + truncated_backprop_length, :].reshape(
+                (1, truncated_backprop_length, num_features))
+            testBatchY = yTest[test_idx:test_idx + truncated_backprop_length].reshape(
+                (1, truncated_backprop_length, 1))
+
+            # _current_state = np.zeros((batch_size,state_size))
+            feed = {batchX_placeholder: testBatchX,
+                    batchY_placeholder: testBatchY}
+
+            # Test_pred contains 'window_size' predictions, we want the last one
+            _last_state, _last_label, test_pred = sess.run([last_state, last_label, prediction], feed_dict=feed)
+            test_pred_list.append(test_pred[-1][0])  # The last one
+
+        return test_pred_list
+
+
+    def get_rnn_column_list(self):
+        # Pick all apporpriate columns to train and test in RNN
+        rnn_column_list = ['trade_px', 'spread']
+        for i in range(1, self.future_price_window + 1):
+            rnn_column_list.append('future_price_%s' % i)
+        for i in range(1, self.order_book_window + 1):
+            rnn_column_list.append('a%s' % i)
+            rnn_column_list.append('aq%s' % i)
+            rnn_column_list.append('aqq%s' % i)
+            rnn_column_list.append('b%s' % i)
+            rnn_column_list.append('bq%s' % i)
+            rnn_column_list.append('bqq%s' % i)
+        return rnn_column_list
 
     def preloadData(self, iteration = 100, interval = 1):            
         data = self.makeFetchDF()
         for i in range(0, iteration):         
             data = pd.concat([data, self.fetchGDAXdata()])
+            #data.tail(1)[trade_id]
             time.sleep(interval)
         return data
             
     def fetchGDAXdata(self):
         data = self.makeFetchDF()
 
-        exchange = ccxt.gdax()
-        trades = exchange.fetch_trades('ETH/USD')
+        #exchange = ccxt.gdax()
+        exchange = ccxt.bitflyer()
+        #print(exchange.fetch_markets())
+        trades = exchange.fetch_trades('BTC/USD')
         trade = trades[0]
 
-        orderbook = exchange.fetch_order_book('ETH/USD')
+        orderbook = exchange.fetch_order_book('BTC/USD')
         asks = orderbook['asks']
         bids = orderbook['bids']
 
@@ -302,20 +327,27 @@ if __name__ == '__main__': #TODO: modularize train_and_predict (take out load an
 
     data_rnn_ckpt = "rnn_saved_models\ethusd_futurema5_volume1_epoch30_nrows20000_222.ckpt"
     x = model_RNN(order_book_range=5, order_book_window=1, future_price_window=20, future_ma_window=20, num_epochs=50)
-
+    #vh = VH()
     #print("preload time %s" % datetime.datetime.now())
-    new_data_rnn = x.preloadData(450, 0.1)
+    new_data_rnn = x.preloadData(100, 0.25)
+    #input(new_data_rnn)
     #print("preload end %s" % time)
     #new_data_rnn.to_csv("preload_data.csv")  # for testing. We can save the data from preload and just reuse that for testing so we don't have to wait every execution.
     #new_data_rnn = pd.read_csv("preload_data.csv")
-    
-    x.train_and_predict(restore=True, data_rnn=new_data_rnn, data_rnn_ckpt=data_rnn_ckpt)
+
+    tf.reset_default_graph()
+    #cell = tf.contrib.rnn.BasicRNNCell(num_units=1) # this takes forever!
+
+    x.train_and_predict(restore=True, data_rnn=new_data_rnn, data_rnn_ckpt=data_rnn_ckpt, cell=None)
     '''
     load the ckpt
-    predict
+    predicts
+    '''
     while True:
-       new_data_rnn.concat(fetchGDAX()) #add it to end
-       new_data_rnn.popleft() # take out the leftmost
+       new_data_rnn = new_data_rnn.drop(0) # take out the leftmost
+       new_data_rnn = pd.concat([new_data_rnn, x.fetchGDAXdata()]) #add it to ends
+       x.train_and_predict(restore=True, data_rnn=new_data_rnn, data_rnn_ckpt=data_rnn_ckpt, cell=None)
+    '''
        predict(new_data_rnn)
     '''
     
