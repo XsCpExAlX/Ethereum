@@ -20,7 +20,28 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from pickle import FALSE
+from tensorflow.contrib.learn.python.learn.estimators import prediction_key
 
+class VariableHolder: #variable holder
+     # num_classes, truncated_backprop_length, num_features, last_state, last_label, prediction, batchX_placeholder, batchY_placeholder
+    num_classes = None
+    truncated_backprop_length = None
+    num_features = None
+    last_state = None
+    last_label = None
+    prediction = None
+    batchX_placeholder = None
+    batchY_placeholder = None
+        
+    def __init__(self, numClasses, truncatedBackdropLength, numFeatures, lastState, lastLabel, Prediction, batchXPlaceholder, batchYPlaceholder):
+        self.num_classes = numClasses
+        self.truncated_backprop_length = truncatedBackdropLength
+        self.num_features = numFeatures
+        self.last_state = lastState
+        self.last_label = lastLabel
+        self.prediction = Prediction
+        self.batchX_placeholder = batchXPlaceholder
+        self.batchY_placeholder = batchYPlaceholder
 
 class model_RNN:
     def __init__(self, order_book_range, order_book_window, future_price_window, future_ma_window, num_epochs):
@@ -29,21 +50,16 @@ class model_RNN:
         self.future_price_window = future_price_window
         self.future_ma_window = future_ma_window
         self.num_epochs = num_epochs
-
-    class VH: #variable holder
-        truncated_backdrop_length = 0
-        num_features = 0
         
-    def process_data(self, data_rnn, restore=False):
+    def process_data(self, data_rnn):
         print('nrows of raw data= %s' % len(data_rnn.index))
 
         # Convert 'trades_date_time' and  'order_date_time' from object to datetime object
         data_rnn['trades_date_time'] = pd.to_datetime(data_rnn['trades_date_time'])
 
         # Add any columns that are needed
-        if 'row_num' in data_rnn.columns:
-            data_rnn = data_rnn.drop('row_num', axis=1)
-        data_rnn.insert(0, 'row_num', range(len(data_rnn.index)))  # This column is used as a surrogate for the row number
+        if 'row_num' not in data_rnn.columns: #TODO: add rownum for new incoming data
+            data_rnn.insert(0, 'row_num', range(len(data_rnn.index)))  # This column is used as a surrogate for the row number
         data_rnn['spread'] = data_rnn['a1'] - data_rnn['b1']
 
         for i in range(1, self.order_book_range + 1):
@@ -52,31 +68,104 @@ class model_RNN:
 
 
         for i in range(1, self.future_price_window + 1):
-            if restore:
-                data_rnn['future_price_%s' % i] = data_rnn['trade_px']
-            else:
-                data_rnn['future_price_%s' % i] = data_rnn['trade_px'].shift(-i)
+            data_rnn['future_price_%s' % i] = data_rnn['trade_px']
             data_rnn['future_ma_%s' % self.future_ma_window] = data_rnn['trade_px'][::-1].rolling(window=self.future_price_window).mean()[::-1]
-        print(data_rnn.head(5))
 
         # Resample data by setting index to 'trades_date_time' to avoid repeats
-        data_rnn = data_rnn.resample('S', on='trades_date_time').mean().interpolate(method='linear')
+        data_rnn = data_rnn.resample('s', on='trades_date_time').mean().interpolate(method='linear')
         print('nrows with resample = %s' % len(data_rnn.index))
 
         # Normalize data
         PriceRange = data_rnn['trade_px'].max() - data_rnn['trade_px'].min()
         PriceMean = data_rnn['trade_px'].mean()
         data_rnn_norm = (data_rnn - data_rnn.mean()) / (data_rnn.max() - data_rnn.min())
-        # print(data_rnn_norm.tail(3))
 
         return PriceRange,PriceMean,data_rnn_norm
 
-    #def initializeVariables(self):
-        #truncated_backprop_length = 5  # The size of the sequence
-        #num_features = 2 + self.future_price_window + self.order_book_window * 6  # The number of columns to be used for xTrain analysis in RNN
-        #last_state, last_label, prediction
-  
-    def train_and_predict(self, restore=False, data_rnn=None, data_rnn_ckpt=None, cell=None, batchX_placeholder=None, batchY_placeholder=None,weight=None, bias=None, labels_series=None):
+    def initializeVariables(self, sess, data_rnn):#, cell):
+        # RNN Hyperparams
+        # num_epochs is already defined as part of the class
+        batch_size = 1
+        total_series_length = len(data_rnn.index)
+        truncated_backprop_length = 5  # The size of the sequence
+        state_size = 10  # The number of neurons
+        num_features = 2 + self.future_price_window + self.order_book_window * 6  # The number of columns to be used for xTrain analysis in RNN
+        num_classes = 1  # The number of targets to be predicted
+        num_batches = int(total_series_length / batch_size / truncated_backprop_length)
+        min_test_size = 1000
+
+        # RNN Placeholders
+        batchX_placeholder = tf.placeholder(dtype=tf.float32, shape=[None, truncated_backprop_length, num_features],
+                                            name='data_ph')
+        batchY_placeholder = tf.placeholder(dtype=tf.float32, shape=[None, truncated_backprop_length, num_classes],
+                                            name='target_ph')
+
+        PriceRange,PriceMean,data_rnn_norm = self.process_data(data_rnn)
+
+        rnn_column_list = self.get_rnn_column_list()
+
+        # RNN Train-Test Split
+        data_rnn_test = data_rnn_norm
+        print('nrows of testing = %s' % len(data_rnn_test.index))
+
+        xTest = data_rnn_test[rnn_column_list].as_matrix()
+        yTest = data_rnn_test[['future_ma_%s' % self.future_ma_window]].as_matrix()
+
+        # Weights and Biases In
+        weight = tf.get_variable(name='weight', shape=[state_size, num_classes])
+        bias = tf.get_variable(name='bias', shape=[num_classes])
+        labels_series = tf.unstack(batchY_placeholder, axis=1)  # Unpacking
+
+        # Forward Pass: Unrolling the cell (input to hidden recurrent layer)
+        cell = tf.contrib.rnn.BasicRNNCell(num_units=state_size) # this takes forever!
+        states_series, current_state = tf.nn.dynamic_rnn(cell=cell, inputs=batchX_placeholder, dtype=tf.float32)
+        states_series = tf.transpose(states_series, [1, 0, 2])
+
+        # Backward Pass: Output
+        last_state = tf.gather(params=states_series, indices=states_series.get_shape()[0] - 1)
+        last_label = tf.gather(params=labels_series, indices=len(labels_series) - 1)
+
+        # Prediction
+        prediction = tf.matmul(last_state, weight) + bias
+
+        # Add saver variable to save and restore all variables from trained model
+        vh = VariableHolder(num_classes, truncated_backprop_length, num_features, last_state, last_label, prediction, batchX_placeholder, batchY_placeholder)
+        saver = tf.train.Saver()
+        return saver, data_rnn_norm, vh
+
+    def predict1(self, sess, data_rnn_norm, vh):
+        # Initialize and run session
+        test_pred_list = self.predict(sess, data_rnn_norm, vh.num_classes, vh.truncated_backprop_length, vh.num_features, vh.last_state, vh.last_label, vh.prediction, vh.batchX_placeholder, vh.batchY_placeholder)
+        return test_pred_list
+
+    def test_predict(self, test_pred_list):
+        test_pred_list[:] = [(x * PriceRange) + PriceMean for x in test_pred_list]
+        yTest[:] = [(x * PriceRange) + PriceMean for x in yTest]
+
+        # Print out real price vs prediction price
+        predict = pd.DataFrame(test_pred_list, columns=['Prediction'])
+        real = pd.DataFrame(yTest, columns=['Price'])
+        real_vs_predict = predict.join(real)
+        with pd.option_context('display.max_rows', None, 'display.max_columns', 3):
+            print(real_vs_predict)
+
+        plt.figure(figsize=(15, 6))
+        plt.plot(yTest, label='Price', color='blue')
+        plt.plot(test_pred_list, label='Predicted', color='red')
+        plt.title('Price vs Predicted')
+        plt.legend(loc='upper left')
+        plt.show()
+
+    def test(self, data_rnn, data_rnn_ckpt):
+        with tf.Session() as sess:
+            #cell = tf.contrib.rnn.BasicRNNCell(num_units=1) # this takes forever!
+            saver, data_rnn_norm, vh = self.initializeVariables(sess, data_rnn)# cell)
+            saver.restore(sess, data_rnn_ckpt)
+            self.predict1(sess, data_rnn_norm, vh)
+        print("end")
+        
+
+    def train_and_predict(self, restore=False, data_rnn=None, data_rnn_ckpt=None, cell=None):
         #tf.reset_default_graph()
         print('Restore model? %s' % restore)
 
@@ -90,18 +179,19 @@ class model_RNN:
         num_classes = 1  # The number of targets to be predicted
         num_batches = int(total_series_length / batch_size / truncated_backprop_length)
         min_test_size = 1000
-        
+
+        print("process data")        
         PriceRange,PriceMean,data_rnn_norm = self.process_data(data_rnn, restore)
+        print("data processed")
 
         rnn_column_list = self.get_rnn_column_list()
 
         # RNN Placeholders
-        '''
         batchX_placeholder = tf.placeholder(dtype=tf.float32, shape=[None, truncated_backprop_length, num_features],
                                             name='data_ph')
         batchY_placeholder = tf.placeholder(dtype=tf.float32, shape=[None, truncated_backprop_length, num_classes],
                                             name='target_ph')
-        '''
+
         # RNN Train-Test Split
         if restore:
             data_rnn_test = data_rnn_norm
@@ -125,11 +215,9 @@ class model_RNN:
 
         if restore:
             # Weights and Biases In
-            ''''
             weight = tf.get_variable(name='weight', shape=[state_size, num_classes])
             bias = tf.get_variable(name='bias', shape=[num_classes])
             labels_series = tf.unstack(batchY_placeholder, axis=1)  # Unpacking
-            '''
         else:
             # Weights and Biases In
             weight = tf.Variable(tf.truncated_normal([state_size, num_classes]), name='weight')
@@ -137,7 +225,7 @@ class model_RNN:
             labels_series = tf.unstack(batchY_placeholder, axis=1)  # Unpacking
 
         # Forward Pass: Unrolling the cell (input to hidden recurrent layer)
-        #cell = tf.contrib.rnn.BasicRNNCell(num_units=state_size) # this takes forever!
+        cell = tf.contrib.rnn.BasicRNNCell(num_units=state_size) # this takes forever!
         states_series, current_state = tf.nn.dynamic_rnn(cell=cell, inputs=batchX_placeholder, dtype=tf.float32)
         states_series = tf.transpose(states_series, [1, 0, 2])
 
@@ -278,52 +366,57 @@ class model_RNN:
             rnn_column_list.append('bqq%s' % i)
         return rnn_column_list
 
-    def preloadData(self, iteration = 100, interval = 1, exchange=ccxt.gdax()):
+    def preloadData(self, iteration = 100, interval = 1):            
         data = self.makeFetchDF()
-        for i in range(0, iteration):         
-            # data = pd.concat([data, self.fetchGDAXData()])
-            data = pd.concat([data, self.fetchExchangeData(exchange=exchange)], ignore_index=True)
+        trade_id = 0
+        i = 0
+        while i < iteration:
+            if i % 20 == 0:
+                print("iteration ",i)
+
+            trade_data, new_trade_id = self.fetchGDAXdata()
+            if new_trade_id != trade_id:
+                trade_id = new_trade_id
+                data = pd.concat([data,trade_data])
+                i += 1
             #data.tail(1)[trade_id]
             time.sleep(interval)
-        return data
 
+        return data, trade_id
+            
+    def fetchGDAXdata(self):
+        data = self.makeFetchDF()
 
-    def fetchExchangeData(self, exchange=ccxt.gdax()):
-        try:
-            data = self.makeFetchDF()
+        #exchange = ccxt.gdax()
+        exchange = ccxt.bitflyer()
+        #print(exchange.fetch_markets())
+        trades = exchange.fetch_trades('BTC/USD')
+        trade = trades[0]
 
-            trades = exchange.fetch_trades('BTC/USD')
-            trade = trades[0]
-
-            orderbook = exchange.fetch_order_book('BTC/USD')
-            asks = orderbook['asks']
-            bids = orderbook['bids']
-
-            values = {'trade_px':trade['price'], 'update_type':trade['side'], 'trades_date_time':trade['datetime']}
-            for i in range(1, self.order_book_range + 1):
-                values['a%s' % i] = asks[i][0]
-                values['aq%s' % i] = asks[i][1]
-                values['b%s' % i] = bids[i][0]
-                values['bq%s' % i] = bids[i][1]
-            return data.append(values, ignore_index=True)
-        except IndexError:
-            pass
+        orderbook = exchange.fetch_order_book('BTC/USD')
+        asks = orderbook['asks']
+        bids = orderbook['bids']
+        
+        values = {'trade_px':trade['price'],'update_type':trade['side'],'trades_date_time':trade['datetime']}
+        for i in range(1, self.order_book_range + 1):
+            values['a%s' % i] = asks[i][0]
+            values['aq%s' % i] = asks[i][1]
+            values['b%s' % i] = bids[i][0]
+            values['bq%s' % i] = bids[i][1]
+        return data.append(values, ignore_index=True), trade['id']
 
     def makeFetchDF(self):
-        try:
-            column_list = ['trade_px', 'trades_date_time', 'update_type']
-            for i in range(1, self.order_book_range + 1):
-                column_list.append('a%s' % i)
-                column_list.append('aq%s' % i)
-                column_list.append('b%s' % i)
-                column_list.append('bq%s' % i)
+        column_list = ['trade_px', 'trades_date_time', 'update_type']
+        for i in range(1, self.order_book_range + 1):
+            column_list.append('a%s' % i)
+            column_list.append('aq%s' % i)
+            column_list.append('b%s' % i)
+            column_list.append('bq%s' % i)
 
-            dataFrame = pd.DataFrame(columns=column_list)
-            return dataFrame
-        except IndexError:
-            pass
+        dataFrame = pd.DataFrame(columns=column_list)
+        return dataFrame
 
-if __name__ == '__main__': #TODO: modularize train_and_predict (take out load and rnnCELL), do loop datafetch & predictions. Fetch data by listening to websocket.
+if __name__ == '__main__': #TODO: modularize train_and_predict (take out load and rnnCELL), Fetch data by listening to websocket.
     # Read DataFrame.csv
     #new_data_rnn = pd.read_csv('C:/Users/Joe/Documents/exch_gdax_ethusd_snapshot_20170913.csv', nrows=2000)
     ''' some data processing done for the loaded csv file that was in train_and_predict(). I took it out here since it is not needed for livedata feeds
@@ -335,65 +428,26 @@ if __name__ == '__main__': #TODO: modularize train_and_predict (take out load an
     '''
 
     data_rnn_ckpt = "rnn_saved_models\ethusd_futurema5_volume1_epoch30_nrows20000_222.ckpt"
-    x = model_RNN(order_book_range=5, order_book_window=1, future_price_window=20, future_ma_window=20, num_epochs=1)
+    x = model_RNN(order_book_range=5, order_book_window=1, future_price_window=20, future_ma_window=20, num_epochs=50)
     #vh = VH()
-    #print("preload time %s" % datetime.datetime.now())
-    new_data_rnn = x.preloadData(30, 1)
-    exch = ccxt.gdax()
-    #input(new_data_rnn)
-    #print("preload end %s" % time)
+    #new_data_rnn, trade_id = x.preloadData(100, 1)
     #new_data_rnn.to_csv("preload_data.csv")  # for testing. We can save the data from preload and just reuse that for testing so we don't have to wait every execution.
-    #new_data_rnn = pd.read_csv("preload_data.csv")
+    new_data_rnn = pd.read_csv("preload_data.csv")
 
     tf.reset_default_graph()
-    
-    data_rnn = new_data_rnn.copy()
+    x.test(new_data_rnn, data_rnn_ckpt)
 
-    batch_size = 1
-    total_series_length = len(data_rnn.index)
-    truncated_backprop_length = 5  # The size of the sequence
-    state_size = 10  # The number of neurons
-    num_features = 2 + x.future_price_window + x.order_book_window * 6  # The number of columns to be used for xTrain analysis in RNN
-    num_classes = 1  # The number of targets to be predicted
-    num_batches = int(total_series_length / batch_size / truncated_backprop_length)
-    min_test_size = 1000
-    
-    PriceRange,PriceMean,data_rnn_norm = x.process_data(data_rnn, True)
-
-    rnn_column_list = x.get_rnn_column_list()
-
-    # RNN Placeholders
-    batchX_placeholder = tf.placeholder(dtype=tf.float32, shape=[None, truncated_backprop_length, num_features],
-                                        name='data_ph')
-    batchY_placeholder = tf.placeholder(dtype=tf.float32, shape=[None, truncated_backprop_length, num_classes],
-                                        name='target_ph')
-
-    data_rnn_test = data_rnn_norm
-    print('nrows of testing = %s' % len(data_rnn_test.index))
-
-
-    # Weights and Biases In
-    weight = tf.get_variable(name='weight', shape=[state_size, num_classes])
-    bias = tf.get_variable(name='bias', shape=[num_classes])
-    labels_series = tf.unstack(batchY_placeholder, axis=1)  # Unpacking
-
-    # Forward Pass: Unrolling the cell (input to hidden recurrent layer)
-    cell = tf.contrib.rnn.BasicRNNCell(num_units=state_size) # this takes forever!
-    input("start")
-    x.train_and_predict(True, new_data_rnn, data_rnn_ckpt, cell, batchX_placeholder, batchY_placeholder,weight,bias,labels_series)
-    input("go")
     '''
-    load the ckpt
-    predicts
-    '''
+    x.train_and_predict(restore=True, data_rnn=new_data_rnn, data_rnn_ckpt=data_rnn_ckpt, cell=None)
+
+    trade_id = 0
     while True:
-       new_data_rnn = new_data_rnn.drop(0) # take out the leftmost
-       new_data_rnn = pd.concat([new_data_rnn, x.fetchExchangeData()]) #add it to ends
-       print(new_data_rnn.head(5))
-       x.train_and_predict(True, new_data_rnn, data_rnn_ckpt, cell, batchX_placeholder, batchY_placeholder,weight,bias,labels_series)
+       tf.reset_default_graph()
+       trade_data,new_trade_id = x.fetchGDAXdata()
+       if new_trade_id != trade_id:
+           trade_id = new_trade_id
+           new_data_rnn = new_data_rnn.drop(0) # take out the leftmost
+           new_data_rnn = pd.concat([new_data_rnn,trade_data]) #add it to ends
+           x.train_and_predict(restore=True, data_rnn=new_data_rnn, data_rnn_ckpt=data_rnn_ckpt, cell=None)
+       time.sleep("hi")
     '''
-       predict(new_data_rnn)
-    '''
-    
-    
-    
