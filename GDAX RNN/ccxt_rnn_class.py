@@ -50,14 +50,9 @@ class model_RNN:
             data_rnn['aqq%s' % i] = data_rnn[['a%s' % i, 'aq%s' % i]].product(axis=1)
             data_rnn['bqq%s' % i] = data_rnn[['b%s' % i, 'bq%s' % i]].product(axis=1)
 
-
         for i in range(1, self.future_price_window + 1):
-            if restore:
-                data_rnn['future_price_%s' % i] = data_rnn['trade_px']
-            else:
-                data_rnn['future_price_%s' % i] = data_rnn['trade_px'].shift(-i)
+            data_rnn['future_price_%s' % i] = data_rnn['trade_px'].shift(-i)
             data_rnn['future_ma_%s' % self.future_ma_window] = data_rnn['trade_px'][::-1].rolling(window=self.future_price_window).mean()[::-1]
-        print(data_rnn.head(5))
 
         # Resample data by setting index to 'trades_date_time' to avoid repeats
         data_rnn = data_rnn.resample('S', on='trades_date_time').mean().interpolate(method='linear')
