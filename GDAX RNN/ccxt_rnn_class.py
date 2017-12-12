@@ -30,6 +30,7 @@ class model_RNN:
         self.future_ma_window = future_ma_window
         self.num_epochs = num_epochs
 
+<<<<<<< HEAD
     class VH: #variable holder
         truncated_backdrop_length = 0
         num_features = 0
@@ -37,6 +38,15 @@ class model_RNN:
     def process_data(self, data_rnn, restore=False):
         print('nrows of raw data= %s' % len(data_rnn.index))
 
+=======
+
+    def train_and_predict(self, restore=False, data_rnn=None, data_rnn_ckpt=None):
+        tf.reset_default_graph()
+
+        # Drop first few rows of data because for some reason prices are 0.00
+        data_rnn = data_rnn.drop(data_rnn.index[0:2])
+
+>>>>>>> parent of 26f9c0d... rnn class
         # Convert 'trades_date_time' and  'order_date_time' from object to datetime object
         data_rnn['trades_date_time'] = pd.to_datetime(data_rnn['trades_date_time'])
 
@@ -56,7 +66,6 @@ class model_RNN:
 
         # Resample data by setting index to 'trades_date_time' to avoid repeats
         data_rnn = data_rnn.resample('S', on='trades_date_time').mean().interpolate(method='linear')
-        print('nrows with resample = %s' % len(data_rnn.index))
 
         # Normalize data
         PriceRange = data_rnn['trade_px'].max() - data_rnn['trade_px'].min()
@@ -94,7 +103,31 @@ class model_RNN:
         
         PriceRange,PriceMean,data_rnn_norm = self.process_data(data_rnn, restore)
 
+<<<<<<< HEAD
         rnn_column_list = self.get_rnn_column_list()
+=======
+
+        # Normalize data
+        PriceRange = data_rnn['trade_px'].max() - data_rnn['trade_px'].min()
+        PriceMean = data_rnn['trade_px'].mean()
+        data_rnn_norm = (data_rnn - data_rnn.mean()) / (data_rnn.max() - data_rnn.min())
+        # print(data_rnn['trade_px'].max())
+        # print(data_rnn.max())
+
+
+        # Pick all apporpriate columns to train and test in RNN
+        rnn_column_list = ['trade_px', 'b1', 'a1', 'spread']
+        for i in range(1, self.future_price_window + 1):
+            rnn_column_list.append('future_price_%s' % i)
+        for i in range(1, self.order_book_window + 1):
+            rnn_column_list.append('a%s' % i)
+            rnn_column_list.append('aq%s' % i)
+            rnn_column_list.append('aqq%s' % i)
+            rnn_column_list.append('b%s' % i)
+            rnn_column_list.append('bq%s' % i)
+            rnn_column_list.append('bqq%s' % i)
+
+>>>>>>> parent of 26f9c0d... rnn class
 
         # RNN Placeholders
         '''
@@ -104,23 +137,16 @@ class model_RNN:
                                             name='target_ph')
         '''
         # RNN Train-Test Split
-        if restore:
-            data_rnn_test = data_rnn_norm
-            print('nrows of testing = %s' % len(data_rnn_test.index))
+        for i in range(min_test_size, len(data_rnn.index)):
+            if (i % truncated_backprop_length * batch_size == 0):
+                test_first_idx = len(data_rnn.index) - i
+                break
+        # Purposefully uses self.data_rnn['row_nums'] because self.data_rnn['row_nums'] also becomes normalized
+        data_rnn_train = data_rnn_norm[data_rnn['row_num'] < test_first_idx]
+        data_rnn_test = data_rnn_norm[data_rnn['row_num'] >= test_first_idx]
 
-        else:
-            for i in range(min_test_size, len(data_rnn.index)):
-                if (i % truncated_backprop_length * batch_size == 0):
-                    test_first_idx = len(data_rnn.index) - i
-                    break
-            # Purposefully uses data_rnn['row_nums'] because data_rnn['row_nums'] also becomes normalized
-            data_rnn_train = data_rnn_norm[data_rnn['row_num'] < test_first_idx]
-            print('nrows of training = %s' % len(data_rnn_train.index))
-            data_rnn_test = data_rnn_norm[data_rnn['row_num'] >= test_first_idx]
-            print('nrows of testing = %s' % len(data_rnn_test.index))
-
-            xTrain = data_rnn_train[rnn_column_list].as_matrix()
-            yTrain = data_rnn_train[['future_ma_%s' % self.future_ma_window]].as_matrix()
+        xTrain = data_rnn_train[rnn_column_list].as_matrix()
+        yTrain = data_rnn_train[['future_ma_%s' % self.future_ma_window]].as_matrix()
         xTest = data_rnn_test[rnn_column_list].as_matrix()
         yTest = data_rnn_test[['future_ma_%s' % self.future_ma_window]].as_matrix()
 
@@ -418,7 +444,7 @@ if __name__ == '__main__': #TODO: modularize train_and_predict (take out load an
     
 =======
     data_rnn = pd.read_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/ETHUSD2_pandas_rnn_prepared_simplified.csv', nrows=50000)
-    new_data_rnn = pd.read_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/ETHUSD2_pandas_rnn_prepared_simplified.csv', nrows=5000)
+    new_data_rnn = pd.read_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/ETHUSD2_pandas_rnn_prepared_simplified.csv', nrows=150000)
     data_rnn_ckpt = 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/rnn_saved_models/testing1'
     x = model_RNN(30, 1, 5, 5, num_epochs=30)
     x.train_and_predict(restore=True, data_rnn=new_data_rnn, data_rnn_ckpt=data_rnn_ckpt)
