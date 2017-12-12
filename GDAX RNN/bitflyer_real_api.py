@@ -1,8 +1,8 @@
 import ccxt
 
 
-access_key = 'MppxYNrFC1YoTGsJ5Jt13e'
-secret_key = 'jVuN1NCgFwtzab1xFnjFsLzX6ugYkcdp4vppPvO4AG0='
+access_key = '6Won77rsSqBiA9c2V1LiMc'
+secret_key = '4mFZse1Mk6/ShwXTQsZHh/MU/BTngROGJbLVaf63YCU='
 
 
 bitflyer = ccxt.bitflyer()
