@@ -427,12 +427,12 @@ if __name__ == '__main__': #TODO: modularize train_and_predict (take out load an
     data_rnn = data_rnn[data_rnn.columns.difference(['order_date_time'])]  # .difference() method removes any columns and automatically reorders columns alphanumerically
     '''
 
-    data_rnn_ckpt = "C:/Users/donut/PycharmProjects/backtrader/backtrader-master/rnn_saved_models/ethusd_futurema5_volume1_epoch30_nrows20000.ckpt"
+    data_rnn_ckpt = "rnn_saved_models\ethusd_futurema5_volume1_epoch30_nrows20000_222.ckpt"
     x = model_RNN(order_book_range=5, order_book_window=1, future_price_window=20, future_ma_window=20, num_epochs=50)
     #vh = VH()
-    new_data_rnn, trade_id = x.preloadData(100, 1)
+    #new_data_rnn, trade_id = x.preloadData(100, 1)
     #new_data_rnn.to_csv("preload_data.csv")  # for testing. We can save the data from preload and just reuse that for testing so we don't have to wait every execution.
-    # new_data_rnn = pd.read_csv("preload_data.csv")
+    new_data_rnn = pd.read_csv("preload_data.csv")
 
     tf.reset_default_graph()
     x.test(new_data_rnn, data_rnn_ckpt)
