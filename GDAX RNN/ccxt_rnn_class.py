@@ -278,27 +278,28 @@ class model_RNN:
             rnn_column_list.append('bqq%s' % i)
         return rnn_column_list
 
-    def preloadData(self, iteration = 100, interval = 1, exchange=ccxt.gdax()):
+    def preloadData(self, iteration = 100, interval = 1):            
         data = self.makeFetchDF()
         for i in range(0, iteration):         
-            # data = pd.concat([data, self.fetchGDAXData()])
-            data = pd.concat([data, self.fetchExchangeData(exchange=exchange)], ignore_index=True)
+            data = pd.concat([data, self.fetchGDAXdata()])
             #data.tail(1)[trade_id]
             time.sleep(interval)
         return data
+            
+    def fetchGDAXdata(self):
+        data = self.makeFetchDF()
 
+        #exchange = ccxt.gdax()
+        exchange = ccxt.bitflyer()
+        #print(exchange.fetch_markets())
+        trades = exchange.fetch_trades('BTC/USD')
+        trade = trades[0]
 
-    def fetchExchangeData(self, exchange=ccxt.gdax()):
-        try:
-            data = self.makeFetchDF()
+        orderbook = exchange.fetch_order_book('BTC/USD')
+        asks = orderbook['asks']
+        bids = orderbook['bids']
 
-            trades = exchange.fetch_trades('BTC/USD')
-            trade = trades[0]
-
-            orderbook = exchange.fetch_order_book('BTC/USD')
-            asks = orderbook['asks']
-            bids = orderbook['bids']
-
+<<<<<<< HEAD
             values = {'trade_px':trade['price'], 'update_type':trade['side'], 'trades_date_time':trade['datetime']}
             for i in range(1, self.order_book_range + 1):
                 values['a%s' % i] = asks[i][0]
@@ -308,20 +309,27 @@ class model_RNN:
             return data.append(values, ignore_index=True)
         except IndexError:
             pass
+=======
+        values = {'trade_px':trade['price'],'update_type':trade['side'],'trades_date_time':trade['timestamp']}
+        for i in range(1, self.order_book_range + 1):
+            values['a%s' % i] = asks[i][0]
+            values['aq%s' % i] = asks[i][1]
+            values['b%s' % i] = bids[i][0]
+            values['bq%s' % i] = bids[i][1]
+        
+        return data.append(values, ignore_index=True)
+>>>>>>> parent of c3ab2e2... ccxt exch market
 
     def makeFetchDF(self):
-        try:
-            column_list = ['trade_px', 'trades_date_time', 'update_type']
-            for i in range(1, self.order_book_range + 1):
-                column_list.append('a%s' % i)
-                column_list.append('aq%s' % i)
-                column_list.append('b%s' % i)
-                column_list.append('bq%s' % i)
+        column_list = ['trade_px', 'trades_date_time', 'update_type']
+        for i in range(1, self.order_book_range + 1):
+            column_list.append('a%s' % i)
+            column_list.append('aq%s' % i)
+            column_list.append('b%s' % i)
+            column_list.append('bq%s' % i)
 
-            dataFrame = pd.DataFrame(columns=column_list)
-            return dataFrame
-        except IndexError:
-            pass
+        dataFrame = pd.DataFrame(columns=column_list)
+        return dataFrame
 
 if __name__ == '__main__': #TODO: modularize train_and_predict (take out load and rnnCELL), do loop datafetch & predictions. Fetch data by listening to websocket.
     # Read DataFrame.csv
@@ -335,11 +343,15 @@ if __name__ == '__main__': #TODO: modularize train_and_predict (take out load an
     '''
 
     data_rnn_ckpt = "rnn_saved_models\ethusd_futurema5_volume1_epoch30_nrows20000_222.ckpt"
-    x = model_RNN(order_book_range=5, order_book_window=1, future_price_window=20, future_ma_window=20, num_epochs=1)
+    x = model_RNN(order_book_range=5, order_book_window=1, future_price_window=20, future_ma_window=20, num_epochs=50)
     #vh = VH()
     #print("preload time %s" % datetime.datetime.now())
+<<<<<<< HEAD
     new_data_rnn = x.preloadData(30, 1)
     exch = ccxt.gdax()
+=======
+    new_data_rnn = x.preloadData(100, 0.25)
+>>>>>>> parent of c3ab2e2... ccxt exch market
     #input(new_data_rnn)
     #print("preload end %s" % time)
     #new_data_rnn.to_csv("preload_data.csv")  # for testing. We can save the data from preload and just reuse that for testing so we don't have to wait every execution.
@@ -388,9 +400,14 @@ if __name__ == '__main__': #TODO: modularize train_and_predict (take out load an
     '''
     while True:
        new_data_rnn = new_data_rnn.drop(0) # take out the leftmost
+<<<<<<< HEAD
        new_data_rnn = pd.concat([new_data_rnn, x.fetchExchangeData()]) #add it to ends
        print(new_data_rnn.head(5))
        x.train_and_predict(True, new_data_rnn, data_rnn_ckpt, cell, batchX_placeholder, batchY_placeholder,weight,bias,labels_series)
+=======
+       new_data_rnn = pd.concat([new_data_rnn, x.fetchGDAXdata()]) #add it to ends
+       x.train_and_predict(restore=True, data_rnn=new_data_rnn, data_rnn_ckpt=data_rnn_ckpt, cell=None)
+>>>>>>> parent of c3ab2e2... ccxt exch market
     '''
        predict(new_data_rnn)
     '''
