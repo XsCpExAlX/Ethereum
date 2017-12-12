@@ -79,9 +79,15 @@ class model_RNN:
         # num_epochs is already defined as part of the class
         batch_size = 1
         total_series_length = len(data_rnn.index)
+<<<<<<< HEAD
         truncated_backprop_length = 5  # The size of the sequence
         state_size = 10  # The number of neurons
         num_features = 2 + self.future_price_window + self.order_book_window * 6  # The number of columns to be used for xTrain analysis in RNN
+=======
+        truncated_backprop_length = 10  # The size of the sequence
+        state_size = 25  # The number of neurons
+        num_features = 4 + self.future_price_window + self.order_book_window * 6  # The number of columns to be used for xTrain analysis in RNN
+>>>>>>> parent of 14e1d8a... rnn class
         num_classes = 1  # The number of targets to be predicted
         num_batches = int(total_series_length / batch_size / truncated_backprop_length)
         min_test_size = 1000
@@ -328,6 +334,7 @@ class model_RNN:
 
 if __name__ == '__main__': #TODO: modularize train_and_predict (take out load and rnnCELL), do loop datafetch & predictions. Fetch data by listening to websocket.
     # Read DataFrame.csv
+<<<<<<< HEAD
     #new_data_rnn = pd.read_csv('C:/Users/Joe/Documents/exch_gdax_ethusd_snapshot_20170913.csv', nrows=2000)
     ''' some data processing done for the loaded csv file that was in train_and_predict(). I took it out here since it is not needed for livedata feeds
     # Drop first few rows of data because for some reason prices are 0.00
@@ -409,3 +416,10 @@ if __name__ == '__main__': #TODO: modularize train_and_predict (take out load an
     
     
     
+=======
+    data_rnn = pd.read_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/ETHUSD2_pandas_rnn_prepared_simplified.csv', nrows=50000)
+    new_data_rnn = pd.read_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/ETHUSD2_pandas_rnn_prepared_simplified.csv', nrows=5000)
+    data_rnn_ckpt = 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/rnn_saved_models/testing1'
+    x = model_RNN(30, 1, 5, 5, num_epochs=30)
+    x.train_and_predict(restore=True, data_rnn=new_data_rnn, data_rnn_ckpt=data_rnn_ckpt)
+>>>>>>> parent of 14e1d8a... rnn class
