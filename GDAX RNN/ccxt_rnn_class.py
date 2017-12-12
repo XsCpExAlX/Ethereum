@@ -30,7 +30,6 @@ class model_RNN:
         self.future_ma_window = future_ma_window
         self.num_epochs = num_epochs
 
-<<<<<<< HEAD
     class VH: #variable holder
         truncated_backdrop_length = 0
         num_features = 0
@@ -38,7 +37,6 @@ class model_RNN:
     def process_data(self, data_rnn, restore=False):
         print('nrows of raw data= %s' % len(data_rnn.index))
 
-=======
 
     def train_and_predict(self, restore=False, data_rnn=None, data_rnn_ckpt=None):
         tf.reset_default_graph()
@@ -46,7 +44,6 @@ class model_RNN:
         # Drop first few rows of data because for some reason prices are 0.00
         data_rnn = data_rnn.drop(data_rnn.index[0:2])
 
->>>>>>> parent of 26f9c0d... rnn class
         # Convert 'trades_date_time' and  'order_date_time' from object to datetime object
         data_rnn['trades_date_time'] = pd.to_datetime(data_rnn['trades_date_time'])
 
@@ -88,24 +85,19 @@ class model_RNN:
         # num_epochs is already defined as part of the class
         batch_size = 1
         total_series_length = len(data_rnn.index)
-<<<<<<< HEAD
         truncated_backprop_length = 5  # The size of the sequence
         state_size = 10  # The number of neurons
         num_features = 2 + self.future_price_window + self.order_book_window * 6  # The number of columns to be used for xTrain analysis in RNN
-=======
         truncated_backprop_length = 10  # The size of the sequence
         state_size = 25  # The number of neurons
         num_features = 4 + self.future_price_window + self.order_book_window * 6  # The number of columns to be used for xTrain analysis in RNN
->>>>>>> parent of 14e1d8a... rnn class
         num_classes = 1  # The number of targets to be predicted
         num_batches = int(total_series_length / batch_size / truncated_backprop_length)
         min_test_size = 1000
         
         PriceRange,PriceMean,data_rnn_norm = self.process_data(data_rnn, restore)
 
-<<<<<<< HEAD
         rnn_column_list = self.get_rnn_column_list()
-=======
 
         # Normalize data
         PriceRange = data_rnn['trade_px'].max() - data_rnn['trade_px'].min()
@@ -127,7 +119,6 @@ class model_RNN:
             rnn_column_list.append('bq%s' % i)
             rnn_column_list.append('bqq%s' % i)
 
->>>>>>> parent of 26f9c0d... rnn class
 
         # RNN Placeholders
         '''
@@ -325,8 +316,7 @@ class model_RNN:
         orderbook = exchange.fetch_order_book('BTC/USD')
         asks = orderbook['asks']
         bids = orderbook['bids']
-
-<<<<<<< HEAD
+        try:
             values = {'trade_px':trade['price'], 'update_type':trade['side'], 'trades_date_time':trade['datetime']}
             for i in range(1, self.order_book_range + 1):
                 values['a%s' % i] = asks[i][0]
@@ -336,7 +326,6 @@ class model_RNN:
             return data.append(values, ignore_index=True)
         except IndexError:
             pass
-=======
         values = {'trade_px':trade['price'],'update_type':trade['side'],'trades_date_time':trade['timestamp']}
         for i in range(1, self.order_book_range + 1):
             values['a%s' % i] = asks[i][0]
@@ -345,7 +334,6 @@ class model_RNN:
             values['bq%s' % i] = bids[i][1]
         
         return data.append(values, ignore_index=True)
->>>>>>> parent of c3ab2e2... ccxt exch market
 
     def makeFetchDF(self):
         column_list = ['trade_px', 'trades_date_time', 'update_type']
@@ -360,7 +348,6 @@ class model_RNN:
 
 if __name__ == '__main__': #TODO: modularize train_and_predict (take out load and rnnCELL), do loop datafetch & predictions. Fetch data by listening to websocket.
     # Read DataFrame.csv
-<<<<<<< HEAD
     #new_data_rnn = pd.read_csv('C:/Users/Joe/Documents/exch_gdax_ethusd_snapshot_20170913.csv', nrows=2000)
     ''' some data processing done for the loaded csv file that was in train_and_predict(). I took it out here since it is not needed for livedata feeds
     # Drop first few rows of data because for some reason prices are 0.00
@@ -374,12 +361,9 @@ if __name__ == '__main__': #TODO: modularize train_and_predict (take out load an
     x = model_RNN(order_book_range=5, order_book_window=1, future_price_window=20, future_ma_window=20, num_epochs=50)
     #vh = VH()
     #print("preload time %s" % datetime.datetime.now())
-<<<<<<< HEAD
     new_data_rnn = x.preloadData(30, 1)
     exch = ccxt.gdax()
-=======
     new_data_rnn = x.preloadData(100, 0.25)
->>>>>>> parent of c3ab2e2... ccxt exch market
     #input(new_data_rnn)
     #print("preload end %s" % time)
     #new_data_rnn.to_csv("preload_data.csv")  # for testing. We can save the data from preload and just reuse that for testing so we don't have to wait every execution.
@@ -428,24 +412,19 @@ if __name__ == '__main__': #TODO: modularize train_and_predict (take out load an
     '''
     while True:
        new_data_rnn = new_data_rnn.drop(0) # take out the leftmost
-<<<<<<< HEAD
        new_data_rnn = pd.concat([new_data_rnn, x.fetchExchangeData()]) #add it to ends
        print(new_data_rnn.head(5))
        x.train_and_predict(True, new_data_rnn, data_rnn_ckpt, cell, batchX_placeholder, batchY_placeholder,weight,bias,labels_series)
-=======
        new_data_rnn = pd.concat([new_data_rnn, x.fetchGDAXdata()]) #add it to ends
        x.train_and_predict(restore=True, data_rnn=new_data_rnn, data_rnn_ckpt=data_rnn_ckpt, cell=None)
->>>>>>> parent of c3ab2e2... ccxt exch market
     '''
        predict(new_data_rnn)
     '''
     
     
     
-=======
     data_rnn = pd.read_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/ETHUSD2_pandas_rnn_prepared_simplified.csv', nrows=50000)
     new_data_rnn = pd.read_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/ETHUSD2_pandas_rnn_prepared_simplified.csv', nrows=150000)
     data_rnn_ckpt = 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/rnn_saved_models/testing1'
     x = model_RNN(30, 1, 5, 5, num_epochs=30)
     x.train_and_predict(restore=True, data_rnn=new_data_rnn, data_rnn_ckpt=data_rnn_ckpt)
->>>>>>> parent of 14e1d8a... rnn class
