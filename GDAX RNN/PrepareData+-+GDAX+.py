@@ -74,7 +74,7 @@ def ATR(df,period):
 # In[4]:
 
 
-df = pd.read_csv('ETHUSD2.csv', nrows=10000)
+df = pd.read_csv('C:\\Users\\Joe\\Documents\\exch_gdax_ethusd_snapshot_20170913.csv', nrows=10000)
 
 
 #dfPrices = pd.read_csv('ETHUSD.csv', delimiter=',',usecols=[1])
@@ -89,7 +89,6 @@ df = pd.read_csv('ETHUSD2.csv', nrows=10000)
 df.rename(columns={"trade_px": "TradePrice"}, inplace=True)
 dfPrices= pd.DataFrame()
 dfPrices["Price"] = df[["b1", "a1"]].mean(axis=1)
-
 
 # In[6]:
 
@@ -219,42 +218,42 @@ b2 = df["b2"]
 b3 = df["b3"]
 b4 = df["b4"]
 b5 = df["b5"]
-b6 = df["b6"]
-b7 = df["b7"]
-b8 = df["b8"]
-b9 = df["b9"]
-b10 = df["b10"]
+# b6 = df["b6"]
+# b7 = df["b7"]
+# b8 = df["b8"]
+# b9 = df["b9"]
+# b10 = df["b10"]
 a1 = df["a1"]
 a2 = df["a2"]
 a3 = df["a3"]
 a4 = df["a4"]
 a5 = df["a5"]
-a6 = df["a6"]
-a7 = df["a7"]
-a8 = df["a8"]
-a9 = df["a9"]
-a10 = df["a10"]
+# a6 = df["a6"]
+# a7 = df["a7"]
+# a8 = df["a8"]
+# a9 = df["a9"]
+# a10 = df["a10"]
 
 bq1 = df["bq1"]
 bq2 = df["bq2"]
 bq3 = df["bq3"]
 bq4 = df["bq4"]
 bq5 = df["bq5"]
-bq6 = df["bq6"]
-bq7 = df["bq7"]
-bq8 = df["bq8"]
-bq9 = df["bq9"]
-bq10 = df["bq10"]
+# bq6 = df["bq6"]
+# bq7 = df["bq7"]
+# bq8 = df["bq8"]
+# bq9 = df["bq9"]
+# bq10 = df["bq10"]
 aq1 = df["aq1"]
 aq2 = df["aq2"]
 aq3 = df["aq3"]
 aq4 = df["aq4"]
 aq5 = df["aq5"]
-aq6 = df["aq6"]
-aq7 = df["aq7"]
-aq8 = df["aq8"]
-aq9 = df["aq9"]
-aq10 = df["aq10"]
+# aq6 = df["aq6"]
+# aq7 = df["aq7"]
+# aq8 = df["aq8"]
+# aq9 = df["aq9"]
+# aq10 = df["aq10"]
 
 bbq1 = df["bbq1"]
 aaq1 = df["aaq1"]
