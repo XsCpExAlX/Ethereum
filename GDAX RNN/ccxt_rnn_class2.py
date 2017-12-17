@@ -483,11 +483,7 @@ class model_RNN:
 
 if __name__ == '__main__': #TODO: modularize train_and_predict (take out load and rnnCELL), Fetch data by listening to websocket.
     # Read DataFrame.csv
-<<<<<<< HEAD
-    new_data_rnn = pd.read_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/BTCUSD_RNN10_bt.csv', nrows=20000)
-=======
     #new_data_rnn = pd.read_csv('C:/Users/Joe/Documents/exch_gdax_ethusd_snapshot_20170913.csv', nrows=20000)
->>>>>>> 66d7428434c424fecfa4c455ec9ed6d407860389
     ''' some data processing done for the loaded csv file that was in train_and_predict(). I took it out here since it is not needed for livedata feeds
     # Drop first few rows of data because for some reason prices are 0.00
     data_rnn = data_rnn.drop(data_rnn.index[0:2])
@@ -496,21 +492,17 @@ if __name__ == '__main__': #TODO: modularize train_and_predict (take out load an
     data_rnn = data_rnn[data_rnn.columns.difference(['order_date_time'])]  # .difference() method removes any columns and automatically reorders columns alphanumerically
     '''
 
-    data_rnn_ckpt = "C:/Users/donut/PycharmProjects/backtrader/backtrader-master/rnn_saved_models/test"
-    x = model_RNN(order_book_range=5, order_book_window=1, future_price_window=20, future_ma_window=20, num_epochs=10)
+    data_rnn_ckpt = "rnn_saved_models/test.ckpt"
+    x = model_RNN(order_book_range=5, order_book_window=1, future_price_window=20, future_ma_window=20, num_epochs=50)
     #vh = VH()
-    new_data_rnn, trade_id = x.preloadData(100, 0.5)
+    #new_data_rnn, trade_id = x.preloadData(100, 0.5)
     #new_data_rnn.to_csv("preload_data.csv")  # for testing. We can save the data from preload and just reuse that for testing so we don't have to wait every execution.
-    #new_data_rnn = pd.read_csv("preload_data.csv")
+    new_data_rnn = pd.read_csv("preload_data.csv")
 
     tf.reset_default_graph()
     #x.test(new_data_rnn, data_rnn_ckpt)
 
-<<<<<<< HEAD
     x.train_and_predict(restore=False, data_rnn=new_data_rnn, data_rnn_ckpt=data_rnn_ckpt)
-=======
-    x.train_and_predict(restore=True, data_rnn=new_data_rnn, data_rnn_ckpt=data_rnn_ckpt, cell=None)
->>>>>>> 66d7428434c424fecfa4c455ec9ed6d407860389
     '''
 
     trade_id = 0
