@@ -182,15 +182,16 @@ class model_RNN:
                 saver.restore(sess, data_rnn_ckpt)
                 # predicted_price = 0
                 # data_rnn, ema1, sma2, ema1_minus_sma2, ema1_minus_trade_px = self.indicators(data_rnn, data_window, maperiod1, maperiod2)
-                data_rnn, position, account_USD, account_coin, coin, buy_price, sell_price, comm, percent = self.initialize_trade_logic(exchange, data_rnn, symbol, data_window)
+                position, account_USD, account_coin, coin, buy_price, sell_price, comm, percent, data_rnn = self.initialize_trade_logic(exchange, data_rnn, symbol, data_window)
 
                 while True:
                     start_time = timer()
                     updated, updated_data_rnn = self.updateData(exchange, data_rnn, symbol)
+                    # print('updated: ', updated_data_rnn)
 
                     if updated:
                         data_rnn = updated_data_rnn
-                        #input(data_rnn['trades_date_time'])
+                        # print('data: ', data_rnn)
                         PriceRange, PriceMean, data_rnn_norm, data_rnn_processed = self.process_data(data_rnn, restore)
                         xTest = data_rnn_norm[self.get_rnn_column_list()].as_matrix()
                         yTest = data_rnn_norm[['future_ma_%s' % self.future_ma_window]].as_matrix()
@@ -214,7 +215,7 @@ class model_RNN:
                         # difference = actual_price.item() - predicted_price
                         print("Actual price: %s, Predicted price: %s" % (actual_price.item(), float('{0:2f}'.format(predicted_price))))
                         # predicted_price = test_pred_list[-1] * PriceRange + PriceMean   # Does using -5 mean using the 5th last value?
-                        data_rnn, position, coin, account_USD, buy_price, sell_price = self.market_trade_logic(exchange, data_rnn, symbol, data_window, maperiod1, maperiod2, delay, position, account_USD, account_coin, coin, buy_price, sell_price, comm, percent)
+                        position, coin, account_USD, buy_price, sell_price = self.market_trade_logic(exchange, data_rnn, symbol, data_window, maperiod1, maperiod2, delay, position, account_USD, account_coin, coin, buy_price, sell_price, comm, percent)
                         print("time taken for iteration: ", timer()-start_time)
                         print("")
                         #self.plot_predictions(test_pred_list, yTest, PriceRange, PriceMean)
@@ -405,13 +406,15 @@ class model_RNN:
         dataFrame = pd.DataFrame(columns=column_list)
         return dataFrame
 
-    def initialize_trade_logic(self, exchange=None, new_data_rnn=pd.DataFrame(), symbol=None, data_window=None):
+    def initialize_trade_logic(self, exchange=None, new_data_rnn=None, symbol=None, data_window=None):
         coin_symbol, usd = symbol.split('/')
-        account_USD = 3000#float('{0:2f}'.format(exchange.fetch_balance()['total'][usd]))
-        account_coin = 0#float('{0:8f}'.format(exchange.fetch_balance()['total'][coin_symbol]))
+        account_USD = 0#float('{0:2f}'.format(exchange.fetch_balance()['total'][usd]))
+        account_coin = 30#float('{0:8f}'.format(exchange.fetch_balance()['total'][coin_symbol]))
         coin = float('{0:8f}'.format(account_coin))
-        buy_price = float('{0:2f}'.format(new_data_rnn['trade_px'][data_window - 1]))  # Market buy price will be the first ask price
-        sell_price = float('{0:2f}'.format(new_data_rnn['trade_px'][data_window - 1]))  # Market sell price will be first bid price
+        new_data_rnn = new_data_rnn.reset_index(drop=True)
+        # print(new_data_rnn)
+        buy_price = float('{0:2f}'.format(new_data_rnn['trade_px'].iloc[data_window - 1]))  # Market buy price will be the first ask price
+        sell_price = float('{0:2f}'.format(new_data_rnn['trade_px'].iloc[data_window - 1]))  # Market sell price will be first bid price
 
         comm = 0.00
         percent = 0.95  # Percent of account that will be used to execure buy order. Choose values between 0.00 and 1.00
@@ -419,13 +422,13 @@ class model_RNN:
             position = True
         else:
             position = False
-        return new_data_rnn, position, account_USD, account_coin, coin, buy_price, sell_price, comm, percent
+        return position, account_USD, account_coin, coin, buy_price, sell_price, comm, percent, new_data_rnn
 
 
-    def market_trade_logic(self, exchange = None, new_data_rnn= pd.DataFrame(), symbol='BTC/USD', data_window=None, maperiod1=None, maperiod2=None, delay=None,
+    def market_trade_logic(self, exchange = None, new_data_rnn=None, symbol='BTC/USD', data_window=None, maperiod1=None, maperiod2=None, delay=None,
                            position=None, account_USD=None, account_coin=None, coin=None, buy_price=None, sell_price=None, comm=None, percent=None):
 
-        ema1, sma2, ema1_minus_sma2, ema1_minus_trade_px, new_data_rnn = self.indicators(new_data_rnn, data_window, maperiod1, maperiod2)
+        ema1, sma2, ema1_minus_sma2, ema1_minus_trade_px = self.indicators(new_data_rnn, data_window, maperiod1, maperiod2)
         if not position:
             if (ema1_minus_sma2 > 0 and ema1_minus_trade_px < 0):
                 position = True
@@ -449,10 +452,10 @@ class model_RNN:
                 coin = float('{0:8f}'.format(account_coin))
                 time.sleep(delay)
 
-        return new_data_rnn, position, coin, account_USD, buy_price, sell_price
+        return position, coin, account_USD, buy_price, sell_price
 
 
-    def indicators(self, new_data_rnn=pd.DataFrame(), data_window=None, maperiod1=None, maperiod2=None):
+    def indicators(self, new_data_rnn=None, data_window=None, maperiod1=None, maperiod2=None):
         ema1 = new_data_rnn['trade_px'][[data_window - maperiod1 - 1, data_window - 1]].ewm(span=maperiod1).mean()[data_window - 1]
         sma2 = new_data_rnn['trade_px'].mean()
         ema1_minus_sma2 = ema1 - sma2
@@ -460,9 +463,10 @@ class model_RNN:
         print('Trade_px = %.2f, EMA[%s]_minus_SMA[%s] = %.2f, EMA[%s]_minus_Trade_px = %.2f' %
               (new_data_rnn['trade_px'][data_window - 1], maperiod1, maperiod2, ema1_minus_sma2, maperiod1,
                ema1_minus_trade_px))
-        return new_data_rnn, ema1, sma2, ema1_minus_sma2, ema1_minus_trade_px
+        return ema1, sma2, ema1_minus_sma2, ema1_minus_trade_px
 
 if __name__ == '__main__': #TODO: modularize train_and_predict (take out load and rnnCELL), Fetch data by listening to websocket.
+
     # Instantiate real gdax api to get live data feed
     # Currently running gdax.py with orderbook level 1
     trade_exch = ccxt.gdax({'apiKey': real_api_key,
@@ -489,16 +493,16 @@ if __name__ == '__main__': #TODO: modularize train_and_predict (take out load an
 
     print('Loading Market...')
     trade_exch.load_markets()  # request markets
-    symbol = 'BTC/USD'
+    symbol = 'LTC/USD'
     data_window = 20
     maperiod1 = 5
     maperiod2 = data_window
     delay = 1
 
 
-    # new_data_rnn, trade_id = x.preloadData(40, delay, exchange=trade_exch, symbol=symbol)
+    new_data_rnn, trade_id = x.preloadData(data_window, delay, exchange=trade_exch, symbol=symbol)
     # new_data_rnn.to_csv("C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/preload_data.csv")  # for testing. We can save the data from preload and just reuse that for testing so we don't have to wait every execution.
-    new_data_rnn = pd.read_csv("C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/preload_data.csv")
+    # new_data_rnn = pd.read_csv("C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/preload_data.csv")
 
     tf.reset_default_graph()
 
