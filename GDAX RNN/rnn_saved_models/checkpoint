@@ -1,2 +1,2 @@
-model_checkpoint_path: "test.ckpt"
-all_model_checkpoint_paths: "test.ckpt"
+model_checkpoint_path: "30_exch_gdax_ltcusd_snapshot_20180112"
+all_model_checkpoint_paths: "30_exch_gdax_ltcusd_snapshot_20180112"
