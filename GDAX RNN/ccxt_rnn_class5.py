@@ -52,6 +52,7 @@ class VariableHolder:  # variable holder
 
 class model_RNN:
     last_trade_id = 0
+    last_trade_price = 0
 
     def __init__(self, order_book_range, order_book_window, future_price_window, future_ma_window, num_epochs):
         self.order_book_range = order_book_range
@@ -357,13 +358,11 @@ class model_RNN:
         return rnn_column_list
 
     def updateData(self, exchange, data_rnn, symbol):
-        new_data_rnn, new_trade_id = self.fetchExchangeData(exchange, symbol)
-        if new_trade_id != self.last_trade_id:
-            # input("update")
+        is_new, new_data_rnn = self.fetchNewExchangeData(exchange, symbol)
+        if is_new:
             data_rnn = data_rnn.drop(data_rnn.head(1).index)
             data_rnn = pd.concat([data_rnn, new_data_rnn])
             data_rnn = data_rnn.reset_index(drop=True)
-            # input(data_rnn)
             return True, data_rnn
 
         return False, data_rnn
@@ -391,6 +390,16 @@ class model_RNN:
 
         self.last_trade_id = trade_id
         return data.sort_values(by='trades_date_time'), trade_id
+
+    def fetchNewExchangeData(self, exchange, symbol):
+        new_data_rnn, new_trade_id = self.fetchExchangeData(exchange, symbol)
+        if new_trade_id != self.last_trade_id:
+            if self.last_trade_price != new_data_rnn['price']:
+                self.last_trade_id = trade_id
+                self.last_trade_price = new_data_rnn['price']
+                return True, new_data_rnn
+
+        return False, None
 
     def fetchExchangeData(self, exchange, symbol):
         data = self.makeFetchDF()
@@ -756,7 +765,7 @@ if __name__ == '__main__':  # TODO: modularize train_and_predict (take out load 
                             'password': real_passphrase,
                             'nonce': ccxt.gdax.seconds,
                             'verbose': False})  # If verbose is True, log HTTP requests
-    trade_exch.urls['api'] = 'https://api.gdax.com'
+    trade_exch.urls['api'] = 'https://api-public.gdax.com'
     # orderbook_exch = ccxt.gdax()
 
     # # Instantiate real bitflyer api to get live data feed
@@ -768,7 +777,7 @@ if __name__ == '__main__':  # TODO: modularize train_and_predict (take out load 
     # # orderbook_exch = ccxt.bitflyer()
 
     # new_data_rnn = pd.read_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/exch_gdax_ethusd_snapshot_20170913.csv', nrows=10000)
-    data_rnn_ckpt = 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/rnn_saved_models/50_exch_gdax_ethusd_snapshot_20180112/50_exch_gdax_ethusd_snapshot_20180112'
+    data_rnn_ckpt = 'rnn_saved_models/50_exch_gdax_ethusd_snapshot_20180112'
     x = model_RNN(order_book_range=5, order_book_window=1, future_price_window=20, future_ma_window=20, num_epochs=50)
 
     print('Loading Market...')
