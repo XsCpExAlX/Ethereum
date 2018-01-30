@@ -11,7 +11,6 @@ import sys  # To find out the script name (in argv[0])
 import backtrader as bt
 import ccxt
 from pandas.core.missing import backfill_1d
-import _thread
 
 # Import the RNN packages
 import tensorflow as tf
@@ -22,6 +21,7 @@ import matplotlib.pyplot as plt
 from pickle import FALSE
 from tensorflow.contrib.learn.python.learn.estimators import prediction_key
 from timeit import default_timer as timer
+import time
 
 class VariableHolder: #variable holder
      # num_classes, truncated_backprop_length, num_features, last_state, last_label, prediction, batchX_placeholder, batchY_placeholder
@@ -56,7 +56,7 @@ class model_RNN:
         self.num_epochs = num_epochs
         
     def process_data(self, data_rnn, restore):
-        #print('nrows of raw data= %s' % len(data_rnn.index))
+        print('nrows of raw data= %s' % len(data_rnn.index))
 
         # Convert 'trades_date_time' and  'order_date_time' from object to datetime object
         data_rnn['trades_date_time'] = pd.to_datetime(data_rnn['trades_date_time'])
@@ -257,7 +257,7 @@ class model_RNN:
         with tf.Session() as sess:
             if restore:
                 saver.restore(sess, data_rnn_ckpt)
-                exchange = ccxt.bitflyer()
+                exchange = ccxt.gdax()
                 predicted_price = 0
                 while True:
                     #input(data_rnn['trades_date_time'])
@@ -294,7 +294,7 @@ class model_RNN:
                         print("")
                         #self.plot_predictions(test_pred_list, yTest, PriceRange, PriceMean)
 
-                        time.sleep(1)
+                        time.sleep(0.75)
             else:
                 tf.global_variables_initializer().run()
 
@@ -429,7 +429,7 @@ class model_RNN:
     def preloadData(self, iteration = 100, interval = 1):
         print("Starting preload")
         data = self.makeFetchDF()
-        exchange = ccxt.bitflyer()
+        exchange = ccxt.gdax()
 
         trade_id = 0
         i = 0
@@ -438,8 +438,9 @@ class model_RNN:
             if i % 20 == 0 and i != j:
                 j = i
                 print("Currently at iteration ",i)
-
+            startTime = timer()
             trade_data, new_trade_id = self.fetchExchangeData(exchange)
+            print('fetch gdax data time: ', timer()-startTime)
             if new_trade_id != trade_id:
                 trade_id = new_trade_id
                 data = pd.concat([data,trade_data])
@@ -455,10 +456,14 @@ class model_RNN:
 
         #exchange = ccxt.gdax()
         #print(exchange.fetch_markets())
+        startTime = timer()
         trades = exchange.fetch_trades('BTC/USD')
+        print('fetch trades time: ',timer()-startTime)
         trade = trades[0]
 
+        startTime = timer()
         orderbook = exchange.fetch_order_book('BTC/USD')
+        print('fetch order book time: ', timer()-startTime)
         asks = orderbook['asks']
         bids = orderbook['bids']
         
@@ -495,14 +500,14 @@ if __name__ == '__main__': #TODO: modularize train_and_predict (take out load an
     data_rnn_ckpt = "rnn_saved_models/test.ckpt"
     x = model_RNN(order_book_range=5, order_book_window=1, future_price_window=20, future_ma_window=20, num_epochs=50)
     #vh = VH()
-    #new_data_rnn, trade_id = x.preloadData(100, 0.5)
+    #new_data_rnn, trade_id = x.preloadData(20, 1)
     #new_data_rnn.to_csv("preload_data.csv")  # for testing. We can save the data from preload and just reuse that for testing so we don't have to wait every execution.
     new_data_rnn = pd.read_csv("preload_data.csv")
 
     tf.reset_default_graph()
     #x.test(new_data_rnn, data_rnn_ckpt)
 
-    x.train_and_predict(restore=False, data_rnn=new_data_rnn, data_rnn_ckpt=data_rnn_ckpt)
+    x.train_and_predict(restore=True, data_rnn=new_data_rnn, data_rnn_ckpt=data_rnn_ckpt)
     '''
 
     trade_id = 0
