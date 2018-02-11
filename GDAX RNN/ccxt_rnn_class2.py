@@ -505,6 +505,13 @@ if __name__ == '__main__': #TODO: modularize train_and_predict (take out load an
     new_data_rnn = pd.read_csv("preload_data.csv")
 
     tf.reset_default_graph()
+#     x = model_RNN(5, 1, 10, 50)
+#     symbol = 'ETH/USD'
+#     data_rnn = pd.read_csv("preload_data.csv")
+#     x.ws = WebsocketClient.WebsocketClient(product_id = 'ETH-USD', channel = "ticker")
+#     while True:
+#         time.sleep(0.5)
+#         x.updateDataWS(ccxt.gdax(), data_rnn, symbol)
     #x.test(new_data_rnn, data_rnn_ckpt)
 
     x.train_and_predict(restore=True, data_rnn=new_data_rnn, data_rnn_ckpt=data_rnn_ckpt)

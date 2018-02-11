@@ -369,35 +369,44 @@ class model_RNN:
 
         return False, data_rnn, update_count
 
-    def fetchNewExchangeData(self, exchange, symbol):
-        new_data_rnn, new_trade_id = self.fetchExchangeDataWS(exchange, symbol)
-        if new_trade_id != self.last_trade_id:
-            self.last_trade_id = trade_id
-            if self.last_trade_price != new_data_rnn['price']:
-                self.last_trade_price = new_data_rnn['price']
-                return True, new_data_rnn
-            else:
-                return False, new_data_rnn
-
-        return False, None
-
     def updateDataWS(self, exchange, data_rnn, symbol):
-        is_new, new_data_rnn = self.fetchNewExchangeData(exchange, symbol)
-        if is_new:
+        price_changed, new_data_rnn = self.fetchNewExchangeData(exchange, symbol)
+        # replace oldest if price changed
+        if price_changed:
             data_rnn = data_rnn.drop(data_rnn.head(1).index)
             data_rnn = pd.concat([data_rnn, new_data_rnn])
             data_rnn = data_rnn.reset_index(drop=True)
             return True, data_rnn
 
-        if new_data_rnn:
-            input(data_rnn)
+        # otherwise, update last data if there were any trades happened since last fetch
+        if new_data_rnn is not None:
             head = data_rnn.head(1).index
-            data_rnn.loc[head:head] = new_data_rnn
-            input(data_rnn)
+            data_rnn.loc[head] = new_data_rnn
             data_rnn = data_rnn.reset_index(drop=True)
-            input(data_rnn)
 
         return False, data_rnn
+
+    def fetchNewExchangeData(self, exchange, symbol):
+        # fetch latest trade data from websocket
+        values, new_trade_id = self.fetchTradeDataWS()
+        if new_trade_id != self.last_trade_id:
+            # make the dataframe with orderbook data
+            new_data = self.makeFetchDF()
+            values.update(self.getOrderBookData(exchange, symbol))
+            values['future_price_%s' % (self.future_price_window)] = values['trade_px']
+            new_data = new_data.append(values, ignore_index=True)
+
+            # now set last trade id
+            self.last_trade_id = new_trade_id
+
+            # if there is a price change, return true
+            if self.last_trade_price != values['trade_px']:
+                self.last_trade_price = values['trade_px']
+                return True, new_data
+            else:
+                return False, new_data
+
+        return False, None
 
     def preloadData(self, iteration=None, interval=None, exchange=None, symbol=None):
         print("Starting preload: %s iterations total" % iteration)
@@ -432,10 +441,6 @@ class model_RNN:
         trades = exchange.fetch_trades(symbol)
         trade = trades[0]
         # print(trade)
-        orderbook = exchange.fetch_order_book(symbol)
-        asks = orderbook['asks']
-        bids = orderbook['bids']
-
         values = {'trade_px': trade['price'], 'update_type': trade['side'], 'trades_date_time': trade['datetime'], 'trade_volume': trade['amount']}
         values['trade_volume'] = trade['amount']
         values['trade_volume_buys'] = trade['amount']
@@ -448,6 +453,18 @@ class model_RNN:
         # values['orderbook_market_strength_pct_change'] = trade['amount']
         # values['trade_px_pct_change'] = trade['price']
 
+        values.update(self.getOrderBookData(exchange, symbol))
+
+        values['future_price_%s' % (self.future_price_window)] = values['trade_px']
+
+        return data.append(values, ignore_index=True), trade['id']
+
+    def getOrderBookData(self, exchange, symbol):
+        orderbook = exchange.fetch_order_book(symbol)
+        asks = orderbook['asks']
+        bids = orderbook['bids']
+        values = {}
+
         for i in range(1, self.orderbook_range + 1):
             values['a%s' % i] = asks[i][0]
             values['aq%s' % i] = asks[i][1]
@@ -455,26 +472,20 @@ class model_RNN:
             values['bq%s' % i] = bids[i][1]
             # values['cumsum_aq%s' % i] = values['aq%s' % i]
             # values['cumsum_bq%s' % i] = values['bq%s' % i]
-        values['future_price_%s' % (self.future_price_window)] = values['trade_px']
 
-        return data.append(values, ignore_index=True), trade['id']
+        return values
+        #values['future_price_%s' % (self.future_price_window)] = values['trade_px']
 
-    def fetchExchangeDataWS(self):
-        trade = ws.getLastMsg()
-        values = {'trade_px': trade['price'], 'update_type': trade['side'], 'trades_date_time': trade['datetime'], 'trade_volume': trade['amount']}
+    def fetchTradeDataWS(self):
+        trade = self.ws.getLastMessage()
+        while trade is None:
+            trade = self.ws.getLastMessage()
+        values = {'trade_px': trade['price'], 'update_type': trade['side'], 'trades_date_time': trade['time'], 'trade_volume': trade['last_size']}
         values['trade_volume'] = trade['last_size']
         values['trade_volume_buys'] = trade['last_size']
         values['trade_volume_sells'] = trade['last_size']
 
-#         for i in range(1, self.orderbook_range + 1):
-#             values['a%s' % i] = asks[i][0]
-#             values['aq%s' % i] = asks[i][1]
-#             values['b%s' % i] = bids[i][0]
-#             values['bq%s' % i] = bids[i][1]
-#         values['future_price_%s' % (self.future_price_window)] = values['trade_px']
-
-        data = self.makeFetchDF()
-        
+        return values, trade['trade_id']
 
     def makeFetchDF(self):
         column_list = ['trade_px', 'update_type', 'trades_date_time', 'order_date_time', 'trade_volume', 'trade_volume_buys', 'trade_volume_sells']
@@ -838,7 +849,7 @@ if __name__ == '__main__':
     resample_freq = '5s' # Use '20s' when restore=False for optimal training
     update_freq = float(resample_freq[:-1]) / delay # This is used to tell update_data() to add that many new rows of data before deleting the row with oldest data
     normalization_factor = 1.00 # This is a rescaling factor to create a bigger window for training data set
-    symbol = 'ETH/USD'
+    symbol = 'ETH-USD'
     data_window = int(future_price_window * update_freq) # Use at least 40 to safely avoid len(test_pred_list) = 0
     maperiod1 = 5
     maperiod2 = 20
@@ -868,7 +879,7 @@ if __name__ == '__main__':
 
 
     tf.reset_default_graph()
-    self.ws = WebsocketClient.WebsocketClient(channel = "ticker")
+    #x.ws = WebsocketClient.WebsocketClient(product_id = 'ETH-USD', channel = "ticker")
     data_rnn, trade_id = x.preloadData(data_window, delay, trade_exch, symbol)
 
     # Process Data

@@ -8,9 +8,10 @@ class WebsocketClient():
             self.url = ws_url[:-1]
         else:
             self.url = ws_url
-        self.stop = False
         self.product_id = product_id
         self.channel = channel
+        self.lastMsg = None
+        self.stop = False
         self.thread = Thread(target=self.setup)
         self.thread.start()
 
@@ -38,7 +39,8 @@ class WebsocketClient():
                 self.message(msg)
 
     def message(self, msg):
-        self.lastMsg = msg
+        if 'side' in msg:
+            self.lastMsg = msg
         #print(msg)
 
     def getLastMessage(self):
