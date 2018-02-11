@@ -3,24 +3,24 @@ from   threading import Thread
 from   websocket import create_connection
 
 class WebsocketClient():
-    def __init__(self, ws_url="wss://ws-feed.gdax.com", product_id="BTC-USD"):
+    def __init__(self, ws_url="wss://ws-feed.gdax.com", product_id="BTC-USD", channel=None):
         if ws_url[-1] == "/":
             self.url = ws_url[:-1]
         else:
             self.url = ws_url
         self.stop = False
         self.product_id = product_id
+        self.channel = channel
         self.thread = Thread(target=self.setup)
         self.thread.start()
 
     def setup(self):
         self.open()
         self.ws = create_connection(self.url)
-        if type(self.product_id) is list:
-            #product_ids - plural for multiple products
-            subParams = json.dumps({"type": "subscribe", "product_ids": self.product_id})
-        else:
-            subParams = json.dumps({"type": "subscribe", "product_id": self.product_id})
+        product = "product_ids"
+        subParams = json.dumps({"type": "subscribe", product: [self.product_id]})
+        if self.channel:
+            subParams = json.dumps({"type": "subscribe", "channels": [{"name":self.channel, product:[self.product_id]}] })
         self.ws.send(subParams)
         self.listen()
 
@@ -32,13 +32,17 @@ class WebsocketClient():
             try:
                 msg = json.loads(self.ws.recv())
             except Exception as e:
-                print e
+                print(e)
                 break
             else:
                 self.message(msg)
 
     def message(self, msg):
-        print(msg)
+        self.lastMsg = msg
+        #print(msg)
+
+    def getLastMessage(self):
+        return self.lastMsg
 
     def close(self):
         self.ws.close()

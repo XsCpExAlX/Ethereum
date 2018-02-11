@@ -8,7 +8,8 @@ import sys
 import time
 import ccxt
 from bitflyer_real_api import access_key, secret_key
-from gdax_real_api import real_api_key, real_secret_key, real_passphrase
+#from gdax_real_api import real_api_key, real_secret_key, real_passphrase
+import WebsocketClient
 
 
 # Import the RNN packages
@@ -21,30 +22,9 @@ import decimal
 from timeit import default_timer as timer
 
 
-class VariableHolder:  # variable holder
-    num_classes = None
-    truncated_backprop_length = None
-    num_features = None
-    last_state = None
-    last_label = None
-    prediction = None
-    batchX_placeholder = None
-    batchY_placeholder = None
-
-    def __init__(self, numClasses, truncatedBackdropLength, numFeatures, lastState, lastLabel, Prediction,
-                 batchXPlaceholder, batchYPlaceholder):
-        self.num_classes = numClasses
-        self.truncated_backprop_length = truncatedBackdropLength
-        self.num_features = numFeatures
-        self.last_state = lastState
-        self.last_label = lastLabel
-        self.prediction = Prediction
-        self.batchX_placeholder = batchXPlaceholder
-        self.batchY_placeholder = batchYPlaceholder
-
-
 class model_RNN:
     last_trade_id = 0
+    last_trade_price = 0
 
 
     def __init__(self, orderbook_range, orderbook_window, future_price_window, num_epochs):
@@ -389,6 +369,36 @@ class model_RNN:
 
         return False, data_rnn, update_count
 
+    def fetchNewExchangeData(self, exchange, symbol):
+        new_data_rnn, new_trade_id = self.fetchExchangeDataWS(exchange, symbol)
+        if new_trade_id != self.last_trade_id:
+            self.last_trade_id = trade_id
+            if self.last_trade_price != new_data_rnn['price']:
+                self.last_trade_price = new_data_rnn['price']
+                return True, new_data_rnn
+            else:
+                return False, new_data_rnn
+
+        return False, None
+
+    def updateDataWS(self, exchange, data_rnn, symbol):
+        is_new, new_data_rnn = self.fetchNewExchangeData(exchange, symbol)
+        if is_new:
+            data_rnn = data_rnn.drop(data_rnn.head(1).index)
+            data_rnn = pd.concat([data_rnn, new_data_rnn])
+            data_rnn = data_rnn.reset_index(drop=True)
+            return True, data_rnn
+
+        if new_data_rnn:
+            input(data_rnn)
+            head = data_rnn.head(1).index
+            data_rnn.loc[head:head] = new_data_rnn
+            input(data_rnn)
+            data_rnn = data_rnn.reset_index(drop=True)
+            input(data_rnn)
+
+        return False, data_rnn
+
     def preloadData(self, iteration=None, interval=None, exchange=None, symbol=None):
         print("Starting preload: %s iterations total" % iteration)
         data = self.makeFetchDF()
@@ -448,6 +458,23 @@ class model_RNN:
         values['future_price_%s' % (self.future_price_window)] = values['trade_px']
 
         return data.append(values, ignore_index=True), trade['id']
+
+    def fetchExchangeDataWS(self):
+        trade = ws.getLastMsg()
+        values = {'trade_px': trade['price'], 'update_type': trade['side'], 'trades_date_time': trade['datetime'], 'trade_volume': trade['amount']}
+        values['trade_volume'] = trade['last_size']
+        values['trade_volume_buys'] = trade['last_size']
+        values['trade_volume_sells'] = trade['last_size']
+
+#         for i in range(1, self.orderbook_range + 1):
+#             values['a%s' % i] = asks[i][0]
+#             values['aq%s' % i] = asks[i][1]
+#             values['b%s' % i] = bids[i][0]
+#             values['bq%s' % i] = bids[i][1]
+#         values['future_price_%s' % (self.future_price_window)] = values['trade_px']
+
+        data = self.makeFetchDF()
+        
 
     def makeFetchDF(self):
         column_list = ['trade_px', 'update_type', 'trades_date_time', 'order_date_time', 'trade_volume', 'trade_volume_buys', 'trade_volume_sells']
@@ -841,6 +868,7 @@ if __name__ == '__main__':
 
 
     tf.reset_default_graph()
+    self.ws = WebsocketClient.WebsocketClient(channel = "ticker")
     data_rnn, trade_id = x.preloadData(data_window, delay, trade_exch, symbol)
 
     # Process Data
