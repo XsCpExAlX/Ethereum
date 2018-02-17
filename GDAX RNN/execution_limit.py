@@ -17,7 +17,8 @@ class RNN (bt.feeds.GenericCSVData):
     ('fromdate', datetime.datetime(2017, 1, 1)),
     ('todate', datetime.datetime(2018, 12, 31)),
     ('nullvalue', 0.0),
-    ('dtformat', ('%Y%m%d %H:%M:%S.%f')),
+    ('dtformat', ('%Y-%m-%d %H:%M:%S')),    # Make sure to also change dtformat in csvgeneric.py
+    # ('dtformat', ('%Y%m%d %H:%M:%S.%f')),
     ('tmformat', ('%H.%M:%S')),
 
     ('datetime', 0),
@@ -27,7 +28,7 @@ class RNN (bt.feeds.GenericCSVData):
     ('low', 3),
     ('close', 4),
     ('RNN', 5),
-    ('volume', 6),
+    ('volume', -1),
     ('openinterest', -1),
 
 )
@@ -37,7 +38,7 @@ class RNN (bt.feeds.GenericCSVData):
 class TestStrategy(bt.Strategy):
     params = (
         ('maperiod1', 5),
-        ('maperiod2', 100),
+        ('maperiod2', 20),
     )
 
     def log(self, txt, dt=None):
@@ -56,7 +57,7 @@ class TestStrategy(bt.Strategy):
         self.buycomm = None
 
         # Add a MovingAverageSimple indicator
-        # self.sma1 = bt.indicators.SimpleMovingAverage(self.datas[0], period=self.params.maperiod1)
+        # self.sma1 = bt.indicators.ExponentialMovingAverage(self.datas[0], period=self.params.maperiod1)
         # self.sma2 = bt.indicators.SimpleMovingAverage(self.datas[0], period=self.params.maperiod2)
 
 
@@ -125,22 +126,31 @@ class TestStrategy(bt.Strategy):
         if not self.position:
             if (self.emaRNN1_minus_smaRNN2[0] > 0 and self.emaRNN1[0] < self.dataRNN[0]):
                 # BUY, BUY, BUY!!! (with all possible default parameters)
-                self.log('BUY CREATE, %.2f' % self.dataclose[0])
+                self.log('BUY CREATE, %.2f' % self.dataRNN[0])
+                # self.log('BUY CREATE, %.2f' % self.dataclose[0])
 
                 # Keep track of the created order to avoid a 2nd order
                 self.order = self.buy(exectype=bt.Order.Limit,
-                                      price=self.dataclose[0]-0.01,
-                                      valid=datetime.timedelta(seconds=30))
+                                      price=self.dataRNN[0],
+                                      valid=datetime.timedelta(seconds=20))
+
+                # self.order = self.buy(exectype=bt.Order.Limit,
+                #                       price=self.dataclose[0] - 0.01,
+                #                       valid=datetime.timedelta(seconds=60))
 
         else:
             if (self.emaRNN1_minus_smaRNN2[0] < 0 and self.emaRNN1[0] > self.dataRNN[0]):
                 # SELL, SELL, SELL!!! (with all possible default parameters)
-                self.log('SELL CREATE, %.2f' % self.dataclose[0])
+                self.log('SELL CREATE, %.2f' % self.dataRNN[0])
+                # self.log('SELL CREATE, %.2f' % self.dataclose[0])
 
                 # Keep track of the created order to avoid a 2nd order
                 self.order = self.sell(exectype=bt.Order.Limit,
-                                       price=self.dataclose[0]+0.01,
-                                       valid=datetime.timedelta(seconds=30))
+                                       price=self.dataRNN[0],
+                                       valid=datetime.timedelta(seconds=20))
+                # self.order = self.sell(exectype=bt.Order.Limit,
+                #                        price=self.dataclose[0] + 0.01,
+                #                        valid=datetime.timedelta(seconds=60))
 
 
 if __name__ == '__main__':
@@ -153,17 +163,17 @@ if __name__ == '__main__':
     # Datas are in a subfolder of the samples. Need to find where the script is
     # because it could have been called from anywhere
     modpath = os.path.dirname(os.path.abspath(sys.argv[0]))
-    datapath = os.path.join(modpath, 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/ETHUSD_RNN10_bt.csv')
+    datapath = os.path.join(modpath, 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/cerebro_data_rnn_bt.csv')
 
     # Create a Data Feed
     data = RNN(
-        dataname=datapath,
-        # Do not pass values before this date
-        sessionstart=datetime.datetime(2017, 9, 17),
-        # Do not pass values before this date
-        sessionend=datetime.datetime(2050, 12, 31),
-        # Do not pass values after this date
-        reverse=False)
+            dataname=datapath,
+            # Do not pass values before this date
+            sessionstart=datetime.datetime(2017, 9, 17),
+            # Do not pass values before this date
+            sessionend=datetime.datetime(2050, 12, 31),
+            # Do not pass values after this date
+            reverse=False)
 
 
 
@@ -174,7 +184,7 @@ if __name__ == '__main__':
     cerebro.broker.setcash(10000.00)
 
     # Add a FixedSize sizer according to the stake
-    cerebro.addsizer(bt.sizers.PercentSizer, percents=20)
+    cerebro.addsizer(bt.sizers.PercentSizer, percents=90)
 
     # Set the commission (limit order is 0.0000)
     cerebro.broker.setcommission(commission=0.0000)
