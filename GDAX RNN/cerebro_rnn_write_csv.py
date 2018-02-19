@@ -7,8 +7,8 @@ import os
 import sys
 import time
 import ccxt
-from bitflyer_real_api import access_key, secret_key
-from gdax_real_api import real_api_key, real_secret_key, real_passphrase
+#from bitflyer_real_api import access_key, secret_key
+#from gdax_real_api import real_api_key, real_secret_key, real_passphrase
 
 
 # Import the RNN packages
@@ -244,7 +244,7 @@ class model_RNN:
                 cerebro_data_rnn = cerebro_data_rnn.drop(cerebro_data_rnn.tail(truncated_backprop_length).index)
                 test_pred_list_price_df = pd.DataFrame(np.array(test_pred_list).reshape(len(test_pred_list), 1), columns=['test_pred_list_price'])
                 test_pred_list_price_df = test_pred_list_price_df.set_index(cerebro_data_rnn.index)
-                cerebro_data_rnn.to_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/cerebro_test.csv')
+                cerebro_data_rnn.to_csv('C:/Users/Joseph/Documents/data/cerebro_test.csv')
                 # test_pred_list_price_df.to_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/test_pred_list_price_df.csv')
 
             else:
@@ -364,13 +364,13 @@ if __name__ == '__main__':
     # Read csv file
     # data_rnn = pd.read_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/50_exch_gdax_btcusd_snapshot_20180112/exch_gdax_btcusd_snapshot_20180112.csv')
     # data_rnn = pd.read_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/50_exch_gdax_ethusd_snapshot_20180112/exch_gdax_ethusd_snapshot_20180112.csv')
-    data_rnn = pd.read_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/ETHUSD2_pandas_rnn_prepared_simplified.csv')
+    data_rnn = pd.read_csv('C:/Users/Joseph/Documents/data/ETHUSD2_pandas_rnn_prepared_simplified.csv')
     # data_rnn = pd.read_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/50_exch_gdax_ltcusd_snapshot_20180112/exch_gdax_ltcusd_snapshot_20180112.csv')
 
 
     # Provide appropriate ckpt file
     # data_rnn_ckpt = 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/rnn_saved_models/btc_test'
-    data_rnn_ckpt = 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/rnn_saved_models/eth_test'
+    data_rnn_ckpt = 'C:/Users/Joseph/Documents/data/eth_test'
     # data_rnn_ckpt = 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/rnn_saved_models/ltc_test'
     # data_rnn_ckpt = 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/rnn_saved_models/test'
 

@@ -7,9 +7,10 @@ import os
 import sys
 import time
 import ccxt
-from bitflyer_real_api import access_key, secret_key
+#from bitflyer_real_api import access_key, secret_key
 #from gdax_real_api import real_api_key, real_secret_key, real_passphrase
 import WebsocketClient
+import FindSlopes
 
 
 # Import the RNN packages
@@ -93,6 +94,7 @@ class model_RNN:
 
         # future_price is purposely calculated after resampling
         if restore:
+            data_rnn = FindSlopes.findPeaks(data_rnn)
             data_rnn['future_price_%s' % (self.future_price_window)] = data_rnn['trade_px']
         else:
             for i in range(1, self.future_price_window + 1):
@@ -833,11 +835,12 @@ class model_RNN:
 
 if __name__ == '__main__':
     # Instantiate real gdax api to get live data feed
-    trade_exch = ccxt.gdax({'apiKey': real_api_key,
-                            'secret': real_secret_key,
-                            'password': real_passphrase,
-                            'nonce': ccxt.gdax.seconds,
-                            'verbose': False})  # If verbose is True, log HTTP requests
+#     trade_exch = ccxt.gdax({'apiKey': real_api_key,
+#                             'secret': real_secret_key,
+#                             'password': real_passphrase,
+#                             'nonce': ccxt.gdax.seconds,
+#                             'verbose': False})  # If verbose is True, log HTTP requests
+    trade_exch = ccxt.gdax()
     trade_exch.urls['api'] = 'https://api.gdax.com'
 
     # Trading parameters
@@ -856,7 +859,7 @@ if __name__ == '__main__':
     comm = 0.0000  # Market trades are 0.25% or 0.0025
     percent = 0.90  # Choose a value between 0 and 1
     order_valid = data_window#60  # Time allowed for a limit trade order to stay opened
-    restore = True
+    restore = False
     live_trading = False
 
 
@@ -868,19 +871,19 @@ if __name__ == '__main__':
 
     # Read csv file
     # data_rnn = pd.read_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/50_exch_gdax_btcusd_snapshot_20180112/exch_gdax_btcusd_snapshot_20180112.csv')
-    data_rnn = pd.read_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/50_exch_gdax_ethusd_snapshot_20180112/exch_gdax_ethusd_snapshot_20180112.csv')
+    data_rnn = pd.read_csv('C:/Users/Joseph/Documents/data/exch_gdax_ethusd_snapshot_20180204.csv')
     # data_rnn = pd.read_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/50_exch_gdax_ltcusd_snapshot_20180112/exch_gdax_ltcusd_snapshot_20180112.csv')
 
     # Provide appropriate ckpt file
     # data_rnn_ckpt = 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/rnn_saved_models/btc_test'
-    data_rnn_ckpt = 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/rnn_saved_models/eth_test'
+    data_rnn_ckpt = 'C:/Users/Joseph/Documents/data/eth_test'
     # data_rnn_ckpt = 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/rnn_saved_models/ltc_test'
     # data_rnn_ckpt = 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/rnn_saved_models/test'
 
 
     tf.reset_default_graph()
     #x.ws = WebsocketClient.WebsocketClient(product_id = 'ETH-USD', channel = "ticker")
-    data_rnn, trade_id = x.preloadData(data_window, delay, trade_exch, symbol)
+    #data_rnn, trade_id = x.preloadData(data_window, delay, trade_exch, symbol)
 
     # Process Data
     x.train_and_predict(restore=restore, live_trading=live_trading, data_rnn=data_rnn, data_rnn_ckpt=data_rnn_ckpt, resample_freq=resample_freq,
