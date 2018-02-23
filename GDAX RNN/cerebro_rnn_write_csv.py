@@ -19,6 +19,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import decimal
 from timeit import default_timer as timer
+from backtrader import cerebro
 
 
 class VariableHolder:  # variable holder
@@ -59,8 +60,7 @@ class model_RNN:
         data_rnn = data_rnn.drop(data_rnn.head(2).index)
         data_rnn['trades_date_time'] = pd.to_datetime(data_rnn['trades_date_time'])
         data_rnn = data_rnn[data_rnn.columns.difference(['order_date_time'])]
-        data_rnn = data_rnn.set_index('trades_date_time')
-        # print(data_rnn.columns)
+        data_rnn = data_rnn.set_index('trades_date_time')#, drop=False)
 
         # Generate cumsum_aq# and cumsum_bq#
         data_rnn['cumsum_aq1'] = data_rnn['aq1']
@@ -123,7 +123,7 @@ class model_RNN:
         PriceRange = data_rnn['trade_px'].max() - data_rnn['trade_px'].min()
         PriceMean = data_rnn['trade_px'].mean()
         data_rnn_norm = (data_rnn - data_rnn.mean()) / (data_rnn.max() - data_rnn.min())
-
+        data_rnn =data_rnn.reset_index()
         return PriceRange, PriceMean, data_rnn_norm, data_rnn
 
     def train_and_predict(self, restore=None, live_trading=None, data_rnn=None, data_rnn_ckpt=None, resample_freq=None, update_freq=None, normalization_factor=None, exchange=None, symbol=None,
@@ -239,12 +239,20 @@ class model_RNN:
                 yTest_price_df = yTest
 
                 # Generate csv compatible with Cerebro (trades_date_time, open, high, low, close, RNN, pct_change, orderbook_market_strength)
-                cerebro_data_rnn = data_rnn_processed
-                yTest_price_df = pd.DataFrame(np.array(yTest).reshape(len(yTest), 1), columns=['yTest_price'], index=cerebro_data_rnn.index)
-                cerebro_data_rnn = cerebro_data_rnn.drop(cerebro_data_rnn.tail(truncated_backprop_length).index)
+                column_list = ['datetime', 'open', 'high', 'low', 'close', 'RNN']
+#                yTest_price_df = pd.DataFrame(np.array(yTest).reshape(len(yTest), 1), columns=['yTest_price'], index=cerebro_data_rnn.index)
+#                cerebro_data_rnn = cerebro_data_rnn.drop(cerebro_data_rnn.tail(truncated_backprop_length).index)
                 test_pred_list_price_df = pd.DataFrame(np.array(test_pred_list).reshape(len(test_pred_list), 1), columns=['test_pred_list_price'])
-                test_pred_list_price_df = test_pred_list_price_df.set_index(cerebro_data_rnn.index)
-                cerebro_data_rnn.to_csv('C:/Users/Joseph/Documents/data/cerebro_test.csv')
+#                test_pred_list_price_df = test_pred_list_price_df.set_index(cerebro_data_rnn.index)
+                cerebro_data_rnn = pd.DataFrame(columns=column_list)
+                input(data_rnn_processed.columns)
+                cerebro_data_rnn['datetime'] = data_rnn_processed['trades_date_time']
+                cerebro_data_rnn['open'] = data_rnn_processed['trade_px']
+                cerebro_data_rnn['high'] = data_rnn_processed['trade_px']
+                cerebro_data_rnn['low'] = data_rnn_processed['trade_px']
+                cerebro_data_rnn['close'] = data_rnn_processed['trade_px']
+                cerebro_data_rnn['RNN'] = test_pred_list_price_df
+                cerebro_data_rnn.to_csv('C:/Users/Joe/Documents/cerebro_test_all.csv')
                 # test_pred_list_price_df.to_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/test_pred_list_price_df.csv')
 
             else:
@@ -304,7 +312,7 @@ class model_RNN:
 
     def get_rnn_column_list(self, restore):
         # Pick all apporpriate columns to train and test in RNN
-        rnn_column_list = ['trade_px', 'trade_px_pct_change', 'orderbook_market_strength']
+        rnn_column_list = ['trade_px', 'trade_px_pct_change', 'orderbook_market_strength', 'abratio']
 
         return rnn_column_list
 
@@ -328,11 +336,12 @@ class model_RNN:
 
 if __name__ == '__main__':
     # Instantiate real gdax api to get live data feed
-    trade_exch = ccxt.gdax({'apiKey': real_api_key,
-                            'secret': real_secret_key,
-                            'password': real_passphrase,
-                            'nonce': ccxt.gdax.seconds,
-                            'verbose': False})  # If verbose is True, log HTTP requests
+#     trade_exch = ccxt.gdax({'apiKey': real_api_key,
+#                             'secret': real_secret_key,
+#                             'password': real_passphrase,
+#                             'nonce': ccxt.gdax.seconds,
+#                             'verbose': False})  # If verbose is True, log HTTP requests
+    trade_exch = ccxt.gdax()
     trade_exch.urls['api'] = 'https://api.gdax.com'
 
     # Trading parameters
@@ -341,7 +350,7 @@ if __name__ == '__main__':
     orderbook_window = 1
     future_price_window = 10 # Use 20 for optimal training
     num_epochs = 50
-    resample_freq = '20s' # Use '20s' when restore=False for optimal training
+    resample_freq = '1s' # Use '20s' when restore=False for optimal training
     update_freq = float(resample_freq[:-1]) / delay # This is used to tell update_data() to add that many new rows of data before deleting the row with oldest data
     normalization_factor = 1.00 # This is a rescaling factor to create a bigger window for training data set
     symbol = 'ETH/USD'
@@ -364,13 +373,13 @@ if __name__ == '__main__':
     # Read csv file
     # data_rnn = pd.read_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/50_exch_gdax_btcusd_snapshot_20180112/exch_gdax_btcusd_snapshot_20180112.csv')
     # data_rnn = pd.read_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/50_exch_gdax_ethusd_snapshot_20180112/exch_gdax_ethusd_snapshot_20180112.csv')
-    data_rnn = pd.read_csv('C:/Users/Joseph/Documents/data/ETHUSD2_pandas_rnn_prepared_simplified.csv')
+    data_rnn = pd.read_csv('C:/Users/Joe/Documents/GitHub/Ethereum/GDAX RNN/exch_gdax_ethusd_snapshot_20180204.csv')
     # data_rnn = pd.read_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/50_exch_gdax_ltcusd_snapshot_20180112/exch_gdax_ltcusd_snapshot_20180112.csv')
 
 
     # Provide appropriate ckpt file
     # data_rnn_ckpt = 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/rnn_saved_models/btc_test'
-    data_rnn_ckpt = 'C:/Users/Joseph/Documents/data/eth_test'
+    data_rnn_ckpt = 'C:/Users/Joe/Documents/GitHub/Ethereum/GDAX RNN/rnn_saved_models/eth_test_all'
     # data_rnn_ckpt = 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/rnn_saved_models/ltc_test'
     # data_rnn_ckpt = 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/rnn_saved_models/test'
 
