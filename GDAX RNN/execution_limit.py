@@ -83,6 +83,8 @@ class TestStrategy(bt.Strategy):
         # Check if an order has been completed
         # Attention: broker could reject order if not enough cash
         if order.status in [order.Completed]:
+            order.executed.value = order.executed.value/order.executed.price*order.created.price
+            order.executed.price = order.created.price
             if order.isbuy():
                 self.log(
                     'BUY EXECUTED, Price: %.2f, Cost: %.2f, Comm %.2f' %
@@ -126,31 +128,57 @@ class TestStrategy(bt.Strategy):
         if not self.position:
             if (self.emaRNN1_minus_smaRNN2[0] > 0 and self.emaRNN1[0] < self.dataRNN[0]):
                 # BUY, BUY, BUY!!! (with all possible default parameters)
-                self.log('BUY CREATE, %.2f' % self.dataRNN[0])
-                # self.log('BUY CREATE, %.2f' % self.dataclose[0])
+                self.log('BUY CREATE, %.2f' % (self.dataclose[0] - 0.10))
 
                 # Keep track of the created order to avoid a 2nd order
                 self.order = self.buy(exectype=bt.Order.Limit,
-                                      price=self.dataRNN[0],
-                                      valid=datetime.timedelta(seconds=20))
-
-                # self.order = self.buy(exectype=bt.Order.Limit,
-                #                       price=self.dataclose[0] - 0.01,
-                #                       valid=datetime.timedelta(seconds=60))
+                                      price=self.dataclose[0] - 0.10,
+                                      valid=datetime.timedelta(minutes=2))
+                # if (self.dataRNN[0] <= self.dataclose[0]):
+                #     self.log('BUY CREATE, %.2f' % self.dataRNN[0])
+                #     # self.log('BUY CREATE, %.2f' % self.dataclose[0])
+                #
+                #     # Keep track of the created order to avoid a 2nd order
+                #     self.order = self.buy(exectype=bt.Order.Limit,
+                #                           price=self.dataRNN[0],
+                #                           valid=datetime.timedelta(minutes=3))
+                #
+                #     # self.order = self.buy(exectype=bt.Order.Limit,
+                #     #                       price=self.dataclose[0] - 0.01,
+                #     #                       valid=datetime.timedelta(seconds=60))
+                # else:
+                #     self.log('BUY CREATE, %.2f' % self.dataclose[0])
+                #
+                #     # Keep track of the created order to avoid a 2nd order
+                #     self.order = self.buy(exectype=bt.Order.Limit,
+                #                           price=self.dataclose[0] - 0.01,
+                #                           valid=datetime.timedelta(minutes=1))
 
         else:
             if (self.emaRNN1_minus_smaRNN2[0] < 0 and self.emaRNN1[0] > self.dataRNN[0]):
                 # SELL, SELL, SELL!!! (with all possible default parameters)
-                self.log('SELL CREATE, %.2f' % self.dataRNN[0])
-                # self.log('SELL CREATE, %.2f' % self.dataclose[0])
+                self.log('SELL CREATE, %.2f' % (self.dataclose[0] + 0.09))
 
                 # Keep track of the created order to avoid a 2nd order
                 self.order = self.sell(exectype=bt.Order.Limit,
-                                       price=self.dataRNN[0],
-                                       valid=datetime.timedelta(seconds=20))
-                # self.order = self.sell(exectype=bt.Order.Limit,
-                #                        price=self.dataclose[0] + 0.01,
-                #                        valid=datetime.timedelta(seconds=60))
+                                       price=self.dataclose[0] + 0.09,
+                                       valid=datetime.timedelta(minutes=2))
+                # if (self.dataRNN[0] >= self.dataclose[0]):
+                #     self.log('SELL CREATE, %.2f' % self.dataRNN[0])
+                #
+                #     # Keep track of the created order to avoid a 2nd order
+                #     self.order = self.sell(exectype=bt.Order.Limit,
+                #                            price=self.dataRNN[0],
+                #                            valid=datetime.timedelta(minutes=1))
+                #
+                # else:
+                #     self.log('SELL CREATE, %.2f' % self.dataclose[0])
+                #     # self.log('SELL CREATE, %.2f' % self.dataclose[0])
+                #
+                #     # Keep track of the created order to avoid a 2nd order
+                #     self.order = self.sell(exectype=bt.Order.Limit,
+                #                            price=self.dataclose[0] + 0.01,
+                #                            valid=datetime.timedelta(minutes=3))
 
 
 if __name__ == '__main__':
@@ -163,7 +191,7 @@ if __name__ == '__main__':
     # Datas are in a subfolder of the samples. Need to find where the script is
     # because it could have been called from anywhere
     modpath = os.path.dirname(os.path.abspath(sys.argv[0]))
-    datapath = os.path.join(modpath, 'C:/Users/Joe/Documents/cerebro_test_all.csv')
+    datapath = os.path.join(modpath, 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/cerebro_data_rnn_bt.csv')
 
     # Create a Data Feed
     data = RNN(
