@@ -22,32 +22,36 @@ def findPeaks(data):
     df['abq']= df['aq1']-df['bq1']
     df['abq5']= df['aqsum5']-df['bqsum5']
     
-    tdt=pd.to_datetime(df.trades_date_time).to_frame()
-    tdt["Spread"] = df["a1"]-df["b1"]
-    tdt['trade_px']=df['trade_px']
+#     tdt=pd.to_datetime(df.trades_date_time).to_frame()
+#     tdt["Spread"] = df["a1"]-df["b1"]
+    df["Spread"] = df["a1"]-df["b1"]
+#     tdt['trade_px']=df['trade_px']
     
-    tdt["a1"] = df["a1"]
-    tdt["b1"] = df["b1"]
-    tdt["aq1"] = df["aq1"]
-    tdt["bq1"] = df["bq1"]
-    
-    tdt["aqsum5"] = df["aqsum5"]
-    tdt["bqsum5"] = df["bqsum5"]
-    tdt['abq']=df['abq']
-    tdt['abq5']=df['abq5']
-    tdt['abratio']= df['aq1']/(df['aq1']+df['bq1'])
+#     tdt["a1"] = df["a1"]
+#     tdt["b1"] = df["b1"]
+#     tdt["aq1"] = df["aq1"]
+#     tdt["bq1"] = df["bq1"]
+#     
+#     tdt["aqsum5"] = df["aqsum5"]
+#     tdt["bqsum5"] = df["bqsum5"]
+#     tdt['abq']=df['abq']
+#     tdt['abq5']=df['abq5']
+#     tdt['abratio']= df['aq1']/(df['aq1']+df['bq1'])
+    df['abratio']= df['aq1']/(df['aq1']+df['bq1'])
     #tdt['ratio5']=pd.rolling_mean(tdt['abratio'], 5)
-    tdt['ratio5']=tdt['abratio'].rolling(window= 5, center=False).mean()
-    tdt['sign_vol']=df['sign_vol']
+#     tdt['ratio5']=tdt['abratio'].rolling(window= 5, center=False).mean()
+    df['ratio5']=df['abratio'].rolling(window= 5, center=False).mean()
+#     tdt['sign_vol']=df['sign_vol']
 
 
-    tdt["trade_volume"]=df["trade_volume"]
+#     tdt["trade_volume"]=df["trade_volume"]
     
+    tdt = df
     tdt=tdt.drop(tdt.index[:5])
     
     
     tdt.index = pd.to_datetime(tdt['trades_date_time'])
-    tdt = tdt.resample('s').mean()
+    tdt = tdt.resample('20s').mean()
     #tdt=tdt.interpolate(method='linear')
     
     """
@@ -77,8 +81,7 @@ def findPeaks(data):
     start['future_px'] = start['trade_px'].shift(-1)
     #print(start.columns.values)
     
-    
-    start = start[['trade_px', 'future_px', 'abq','abq5','abratio', 'ratio5','sign_vol','trade_volume']]
+    #start = start[['trade_px', 'future_px', 'abq','abq5','abratio', 'ratio5','sign_vol','trade_volume']]
     
     """
     plt.figure(figsize=(25,7))

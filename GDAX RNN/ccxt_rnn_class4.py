@@ -488,7 +488,7 @@ if __name__ == '__main__': #TODO: modularize train_and_predict (take out load an
 
 
     # new_data_rnn = pd.read_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/exch_gdax_ethusd_snapshot_20170913.csv', nrows=10000)
-    data_rnn_ckpt = 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/rnn_saved_models/test.ckpt'
+    data_rnn_ckpt = "rnn_saved_models/test.ckpt"
     x = model_RNN(order_book_range=5, order_book_window=1, future_price_window=20, future_ma_window=20, num_epochs=50)
 
     print('Loading Market...')

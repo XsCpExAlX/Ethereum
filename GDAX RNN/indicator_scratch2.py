@@ -41,80 +41,107 @@ class model_RNN:
         data_rnn['trades_date_time'] = pd.to_datetime(data_rnn['trades_date_time'])
         data_rnn = data_rnn[data_rnn.columns.difference(['order_date_time'])]
         data_slope = data_rnn
-        
-        """
-        data_rnn = data_rnn.set_index('trades_date_time')
-        # print(data_rnn.columns)
 
-        # Generate cumsum_aq# and cumsum_bq#
-        data_rnn['cumsum_aq1'] = data_rnn['aq1']
-        data_rnn['cumsum_bq1'] = data_rnn['bq1']
-        for i in range(2, self.orderbook_range + 1):
-            data_rnn['cumsum_aq%s' % i] = data_rnn['aq%s' % i] + data_rnn['cumsum_aq%s' % (i - 1)]
-            data_rnn['cumsum_bq%s' % i] = data_rnn['bq%s' % i] + data_rnn['cumsum_bq%s' % (i - 1)]
- 
-        # # Generate trade_volume_buys and trade_volume_sells based on update_type
-        data_rnn['trade_volume_buys'] = data_rnn['update_type']
-        data_rnn['trade_volume_sells'] = data_rnn['update_type']
-        if data_rnn['update_type'].dtypes == 'float64':
-            data_rnn['trade_volume_buys'] = data_rnn['trade_volume_buys'].map({1: 1, 2: 0}).multiply(data_rnn['trade_volume'])
-            data_rnn['trade_volume_sells'] = data_rnn['trade_volume_sells'].map({1: 0, 2: 1}).multiply(data_rnn['trade_volume'])
+        if not restore:
+            data_rnn = FindSlopes.findPeaks(data_slope)
+            #data_rnn=data_rnn.drop('trades_date_time',axis=1)
         else:
-            data_rnn['trade_volume_buys'] = data_rnn['trade_volume_buys'].map({'buy': 1, 'sell': 0}).multiply(
-                data_rnn['trade_volume'])
-            data_rnn['trade_volume_sells'] = data_rnn['trade_volume_sells'].map({'buy': 0, 'sell': 1}).multiply(
-                data_rnn['trade_volume'])
- 
-        # Generate dictionary for resampling (or groupby)
-        d1 = {'a%s' % (k): ['mean'] for k in range(1, self.orderbook_range + 1)}
-        d2 = {'b%s' % (k): ['mean'] for k in range(1, self.orderbook_range + 1)}
-        d3 = {'trade_px': ['mean'], 'trade_volume': ['sum'], 'trade_volume_buys': ['sum'], 'trade_volume_sells': ['sum']}
-        d4 = {'cumsum_aq%s' % (k): ['mean'] for k in range(1, self.orderbook_range + 1)}
-        d5 = {'cumsum_bq%s' % (k): ['mean'] for k in range(1, self.orderbook_range + 1)}
-        d6 = {'aq%s' % (k): ['mean'] for k in range(1, self.orderbook_range + 1)}
-        d7 = {'bq%s' % (k): ['mean'] for k in range(1, self.orderbook_range + 1)}
-        d1.update(d2)
-        d1.update(d3)
-        d1.update(d4)
-        d1.update(d5)
-        d1.update(d6)
-        d1.update(d7)
- 
- 
-        # data_rnn = data_rnn.resample(resample_freq).agg(d1)
-        data_rnn = data_rnn.groupby(pd.Grouper(freq=resample_freq)).agg(d1).interpolate(method='time')
-        data_rnn.columns = data_rnn.columns.droplevel(level=1)
- 
-        data_rnn['trade_volume_buys_minus_asks'] = data_rnn['trade_volume_buys'] - data_rnn['cumsum_aq1']
-        data_rnn['trade_volume_sells_minus_bids'] = data_rnn['trade_volume_sells'] - data_rnn['cumsum_bq1']
-        data_rnn['orderbook_market_strength'] = data_rnn['trade_volume_buys_minus_asks'] - data_rnn['trade_volume_sells_minus_bids']
- 
-        # data_rnn['orderbook_market_strength_pct_change'] = data_rnn['orderbook_market_strength'].pct_change(periods=self.future_price_window)
-        data_rnn['trade_px_pct_change'] = data_rnn['trade_px'].pct_change(periods=self.future_price_window)
-        data_rnn = data_rnn.drop(data_rnn.head(self.future_price_window).index) # This is to prevent pct_change from producing NaN for loss
+            data_rnn['diff']=data_rnn['trade_px'].diff(periods=1).round(8)
+            data_rnn['norepeat']=data_rnn['diff'].loc[data_rnn['diff'].shift(-1) != 0]
+            diff = data_rnn[data_rnn['diff'] != 0]
+            nans = pd.isnull(diff)
+            #norepeat = norepeat[np.isfinite(tdt['norepeat'])]
+            data_rnn = data_rnn[data_rnn['norepeat'] == 0]
+            data_rnn=data_rnn.drop('diff', axis=1)
+            data_rnn=data_rnn.drop('norepeat', axis=1)
+        
+        
+        data_rnn = data_rnn.set_index('trades_date_time')
 
-        """
+#         if restore:
+#             data_rnn=data_rnn.resample('10s').mean()
+
+#         # Generate cumsum_aq# and cumsum_bq#
+#         data_rnn['cumsum_aq1'] = data_rnn['aq1']
+#         data_rnn['cumsum_bq1'] = data_rnn['bq1']
+#         for i in range(2, self.orderbook_range + 1):
+#             data_rnn['cumsum_aq%s' % i] = data_rnn['aq%s' % i] + data_rnn['cumsum_aq%s' % (i - 1)]
+#             data_rnn['cumsum_bq%s' % i] = data_rnn['bq%s' % i] + data_rnn['cumsum_bq%s' % (i - 1)]
+# 
+#         # # Generate trade_volume_buys and trade_volume_sells based on update_type
+#         data_rnn['trade_volume_buys'] = data_rnn['update_type']
+#         data_rnn['trade_volume_sells'] = data_rnn['update_type']
+#         if data_rnn['update_type'].dtypes == 'float64':
+#             data_rnn['trade_volume_buys'] = data_rnn['trade_volume_buys'].map({1: 1, 2: 0}).multiply(data_rnn['trade_volume'])
+#             data_rnn['trade_volume_sells'] = data_rnn['trade_volume_sells'].map({1: 0, 2: 1}).multiply(data_rnn['trade_volume'])
+#         else:
+#             data_rnn['trade_volume_buys'] = data_rnn['trade_volume_buys'].map({'buy': 1, 'sell': 0}).multiply(
+#                 data_rnn['trade_volume'])
+#             data_rnn['trade_volume_sells'] = data_rnn['trade_volume_sells'].map({'buy': 0, 'sell': 1}).multiply(
+#                 data_rnn['trade_volume'])
+#
+#         # Generate dictionary for resampling (or groupby)
+#         d1 = {'a%s' % (k): ['mean'] for k in range(1, self.orderbook_range + 1)}
+#         d2 = {'b%s' % (k): ['mean'] for k in range(1, self.orderbook_range + 1)}
+#         d3 = {'trade_px': ['mean'], 'trade_volume': ['sum'], 'trade_volume_buys': ['sum'], 'trade_volume_sells': ['sum']}
+#         d4 = {'cumsum_aq%s' % (k): ['mean'] for k in range(1, self.orderbook_range + 1)}
+#         d5 = {'cumsum_bq%s' % (k): ['mean'] for k in range(1, self.orderbook_range + 1)}
+#         d6 = {'aq%s' % (k): ['mean'] for k in range(1, self.orderbook_range + 1)}
+#         d7 = {'bq%s' % (k): ['mean'] for k in range(1, self.orderbook_range + 1)}
+#         d8 = {'abratio': ['mean'] for k in range(1, self.orderbook_range + 1)}
+#         d9 = {'ratio5': ['mean'] for k in range(1, self.orderbook_range + 1)}
+#         d1.update(d2)
+#         d1.update(d3)
+#         d1.update(d4)
+#         d1.update(d5)
+#         d1.update(d6)
+#         d1.update(d7)
+#         d1.update(d8)
+#         d1.update(d9) 
+#  
+#         # data_rnn = data_rnn.resample(resample_freq).agg(d1)
+#         data_rnn = data_rnn.groupby(pd.Grouper(freq=resample_freq)).agg(d1).interpolate(method='time')
+#         data_rnn.columns = data_rnn.columns.droplevel(level=1)
+#  
+#         data_rnn['trade_volume_buys_minus_asks'] = data_rnn['trade_volume_buys'] - data_rnn['cumsum_aq1']
+#         data_rnn['trade_volume_sells_minus_bids'] = data_rnn['trade_volume_sells'] - data_rnn['cumsum_bq1']
+#         data_rnn['orderbook_market_strength'] = data_rnn['trade_volume_buys_minus_asks'] - data_rnn['trade_volume_sells_minus_bids']
+#  
+#         # data_rnn['orderbook_market_strength_pct_change'] = data_rnn['orderbook_market_strength'].pct_change(periods=self.future_price_window)
+#         data_rnn['trade_px_pct_change'] = data_rnn['trade_px'].pct_change(periods=self.future_price_window)
+#         data_rnn = data_rnn.drop(data_rnn.head(self.future_price_window).index) # This is to prevent pct_change from producing NaN for loss
 
         # future_price is purposely calculated after resampling
         if restore:
-            data_rnn['future_price_%s' % (self.future_price_window)] = data_rnn['trade_px']
+            shifted = data_rnn['trade_px'].shift(1)
+            data_rnn['price_change'] = shifted -data_rnn['trade_px']
+            
+            data_rnn['abratio']= data_rnn['aq1']/(data_rnn['aq1']+data_rnn['bq1'])
+            data_rnn['ratio5']=data_rnn['abratio'].rolling(window= 5, center=False).mean()
+
+#             data_rnn['future_price_%s' % (self.future_price_window)] = data_rnn['trade_px']
+            data_rnn['future_price_%s' % (self.future_price_window)] = data_rnn['price_change']
+            print(data_rnn['future_price_1'])
         else:
-            data_rnn = FindSlopes.findPeaks(data_slope)
-            data_rnn=data_rnn.drop('trades_date_time',axis=1)
             for i in range(1, self.future_price_window + 1):
-                data_rnn['future_price_%s' % (i)] = data_rnn['trade_px'][::-1].rolling(window=i).mean()[::-1]
+                data_rnn['future_price_%s' % (i)] = data_rnn['price_change']
+                #data_rnn['future_price_%s' % (i)] = data_rnn['price_change'][::-1].rolling(window=i).mean()[::-1]
 
         # if 'row_num' not in data_rnn.columns: #TODO: add rownum for new incoming data
         data_rnn.insert(0, 'row_num', range(len(data_rnn.index)))  # surrogate for the row number
 
         # Normalize data
         if restore:
-            PriceRange = data_rnn['trade_px'].max() - data_rnn['trade_px'].min()
-            PriceMean = data_rnn['trade_px'].mean()
+            PriceRange = data_rnn['price_change'].max() - data_rnn['price_change'].min()
+            PriceMean = data_rnn['price_change'].mean()
             data_rnn_norm = (data_rnn - data_rnn.mean()) / (data_rnn.max() - data_rnn.min())
+
+            #PriceRange = data_rnn['trade_px'].max() - data_rnn['trade_px'].min()
+            #PriceMean = data_rnn['trade_px'].mean()
+            #data_rnn_norm = data_rnn(data_rnn - data_rnn.mean()) / (data_rnn.max() - data_rnn.min())
         else:
-            PriceRange = data_rnn['trade_px'].max() - data_rnn['trade_px'].min()
-            PriceMean = data_rnn['trade_px'].mean()
+            PriceRange = data_rnn['price_change'].max() - data_rnn['price_change'].min()
+            PriceMean = data_rnn['price_change'].mean()
             data_rnn_norm = (data_rnn - data_rnn.mean()) / (data_rnn.max() - data_rnn.min())
 
         return PriceRange, PriceMean, data_rnn_norm, data_rnn
@@ -130,7 +157,7 @@ class model_RNN:
         total_series_length = len(data_rnn.index)
         truncated_backprop_length = self.future_price_window  # The size of the sequence
         state_size = 10  # The number of neurons
-        num_features = 4  # The number of columns to be used for xTrain analysis in RNN
+        num_features = 2  # The number of columns to be used for xTrain analysis in RNN
         num_classes = 1  # The number of targets to be predicted
         num_batches = int(total_series_length / batch_size / truncated_backprop_length)
         min_test_size = 100
@@ -163,11 +190,12 @@ class model_RNN:
             data_rnn_test = data_rnn_norm[data_rnn_processed['row_num'] >= test_first_idx]
             print('nrows of testing = %s' % len(data_rnn_test.index))
 
-            print(data_rnn_train.columns)
+            #print(data_rnn_train.columns)
             xTrain = data_rnn_train[rnn_column_list].as_matrix()
             yTrain = data_rnn_train[['future_price_%s' % self.future_price_window]].as_matrix()
         xTest = data_rnn_test[rnn_column_list].as_matrix()
         yTest = data_rnn_test[['future_price_%s' % self.future_price_window]].as_matrix()
+        input(yTest)
 
         if restore:
             # Weights and Biases In
@@ -219,16 +247,17 @@ class model_RNN:
 
                 while True:
                     start_time = timer()
-                    updated, updated_data_rnn, update_count = self.updateData(exchange, data_rnn, symbol, update_count)
+                    if live_trading:
+                        updated, updated_data_rnn, update_count = self.updateData(exchange, data_rnn, symbol, update_count)
 
-                    if updated:
-                        data_rnn = updated_data_rnn
+                    if True: #TODO: if live_Trading?
+                        #data_rnn = updated_data_rnn
                         test_pred_list = []
                         PriceRange, PriceMean, data_rnn_norm, data_rnn_processed = self.process_data(restore, data_rnn,
                                                                                                      resample_freq=resample_freq)
                         xTest = data_rnn_test[rnn_column_list].as_matrix()
+                        #yTest = data_rnn_test[['future_price_%s' % self.future_price_window]].as_matrix()
                         yTest = data_rnn_test[['future_price_%s' % self.future_price_window]].as_matrix()
-
                         # TEST
                         for test_idx in range(len(xTest) - truncated_backprop_length):
                             testBatchX = xTest[test_idx:test_idx + truncated_backprop_length, :].reshape(
@@ -244,20 +273,24 @@ class model_RNN:
                             _last_state, _last_label, test_pred = sess.run([last_state, last_label, prediction], feed_dict=feed)
                             test_pred_list.append(test_pred[-1][0])  # The last one
 
-                        test_pred_list[:] = [(x * PriceRange) + PriceMean for x in test_pred_list]
-                        yTest[:] = [(x * PriceRange) + PriceMean for x in yTest]
-                        yTest = pd.DataFrame({'yTest': yTest.tolist()}) # yTest is converted from numpy-array to dataframe
-                        print('len(test_pred_list): %s, update_count: %s, resample_freq: %s' % (len(test_pred_list), update_count, resample_freq))
-                        # actual_price = data_rnn_processed['trade_px'].last().iloc[0].iloc[0]
-                        actual_price = data_rnn_processed['trade_px'].tail(1)
-                        yTest_price = yTest['yTest'].iloc[-1][0]
-                        test_pred_list_price = test_pred_list[-1]
-                        difference = test_pred_list_price - actual_price
-
-                        print('trade_px: %s, yTest_price: %s, test_pred_list_price: %s' % (actual_price), yTest_price, test_pred_list_price)
-                        print('Difference: %s' % difference)
+                        actual_price_df = data_rnn_processed['trade_px'].tail(len(data_rnn_test.index)).reset_index(drop=True)
+                        test_pred_list[:] = [actual_price_df[x] + (test_pred_list[x]*PriceRange) for x in range(len(test_pred_list))]
+                        yTest[:] = [(yTest[x] * PriceRange) + PriceMean + actual_price_df[x] for x in range(len(yTest))]
+                        test_pred_list_price_df = test_pred_list
+                        yTest_price_df = yTest
 
                         if live_trading:
+                            actual_price = data_rnn_processed['trade_px'].tail(1)
+                            yTest = pd.DataFrame({'yTest': yTest.tolist()}) # yTest is converted from numpy-array to dataframe
+                            print('len(test_pred_list): %s, update_count: %s, resample_freq: %s' % (len(test_pred_list), update_count, resample_freq))
+                            # actual_price = data_rnn_processed['trade_px'].last().iloc[0].iloc[0]
+                            yTest_price = yTest['yTest'].iloc[-1][0]
+                            test_pred_list_price = test_pred_list[-1]
+                            #difference = test_pred_list_price - actual_price
+
+                            print('trade_px: %s, yTest_price: %s, test_pred_list_price: %s' % (actual_price), yTest_price, test_pred_list_price)
+                            print('Difference: %s' % difference)
+
                             position, coin, account_USD, buy_price, sell_price, limit_valid, limit_buy_executed, limit_sell_executed, update_count, percent_increase = self.limit_trade_logic(
                                 exchange, data_rnn, test_pred_list_price, symbol, data_window, maperiod1, maperiod2,
                                 delay,
@@ -268,10 +301,26 @@ class model_RNN:
                                 start_account=start_account, update_count=update_count,
                                 percent_increase=percent_increase)
 
+                    data_rnn_processed = data_rnn_processed.reset_index()
+                    column_list = ['datetime', 'open', 'high', 'low', 'close', 'RNN']
+#                yTest_price_df = pd.DataFrame(np.array(yTest).reshape(len(yTest), 1), columns=['yTest_price'], index=cerebro_data_rnn.index)
+#                cerebro_data_rnn = cerebro_data_rnn.drop(cerebro_data_rnn.tail(truncated_backprop_length).index)
+                    test_pred_list_price_df = pd.DataFrame(np.array(test_pred_list).reshape(len(test_pred_list), 1), columns=['test_pred_list_price'])
+#                test_pred_list_price_df = test_pred_list_price_df.set_index(cerebro_data_rnn.index)
+                    cerebro_data_rnn = pd.DataFrame(columns=column_list)
+                    cerebro_data_rnn['datetime'] = data_rnn_processed['trades_date_time']
+                    cerebro_data_rnn['open'] = data_rnn_processed['trade_px']
+                    cerebro_data_rnn['high'] = data_rnn_processed['trade_px']
+                    cerebro_data_rnn['low'] = data_rnn_processed['trade_px']
+                    cerebro_data_rnn['close'] = data_rnn_processed['trade_px']
+                    cerebro_data_rnn['RNN'] = test_pred_list_price_df
+                    cerebro_data_rnn.to_csv('C:/Users/Joe/Documents/cerebro_test_all.csv')
+
                     time.sleep(delay)
                     print('Time taken for iteration: ', timer() - start_time)
                     print('')
-                    # self.plot_predictions(actual_price_df, test_pred_list_price_df, yTest_price_df)
+
+                    self.plot_predictions(actual_price_df, yTest_price_df, test_pred_list_price_df)
 
             else:
                 for epoch_idx in range(self.num_epochs):
@@ -318,10 +367,13 @@ class model_RNN:
                     # Test_pred contains 'window_size' predictions, we want the last one
                     _last_state, _last_label, test_pred = sess.run([last_state, last_label, prediction], feed_dict=feed)
                     test_pred_list.append(test_pred[-1][0])  # The last one
+                    print(test_pred[-1][0])
 
-                test_pred_list[:] = [(x * PriceRange) + PriceMean for x in test_pred_list]
-                yTest[:] = [(x * PriceRange) + PriceMean for x in yTest]
+                #actual_price_df = data_rnn_processed['trade_px'].tail(len(data_rnn_test.index)+1).reset_index(drop=True)
                 actual_price_df = data_rnn_processed['trade_px'].tail(len(data_rnn_test.index)).reset_index(drop=True)
+                test_pred_list[:] = [actual_price_df[x] + (test_pred_list[x]*PriceRange) for x in range(len(test_pred_list))]
+                #yTest[:] = [(x * PriceRange) + PriceMean for x in test_pred_list]
+                yTest[:] = [(yTest[x] * PriceRange) + PriceMean + actual_price_df[x] for x in range(len(yTest))]
                 test_pred_list_price_df = test_pred_list
                 yTest_price_df = yTest
 
@@ -329,9 +381,9 @@ class model_RNN:
 
 
     def get_rnn_column_list(self, restore):
-        # Pick all apporpriate columns to train and test in RNN
-        rnn_column_list = ['trade_px','price_change', 'abratio', 'ratio5']
-        # rnn_column_list = ['trade_px', 'trade_px_pct_change', 'orderbook_market_strength', 'orderbook_market_strength_pct_change']
+        # Pick all appropriate columns to train and test in RNN
+        rnn_column_list = ['abratio', 'ratio5']
+        #rnn_column_list = ['trade_px', 'trade_px_pct_change', 'orderbook_market_strength', 'orderbook_market_strength_pct_change']
 
         # # rnn_column_list purposely excludes future_price_window+1 because that will be the target and thus must avoid double counting
         # for i in range(1, self.future_price_window):
@@ -852,9 +904,9 @@ if __name__ == '__main__':
     delay = 1
     orderbook_range = 5
     orderbook_window = 1
-    future_price_window = 20 # Use 20 for optimal training
-    num_epochs = 300
-    resample_freq = '5s' # Use '20s' when restore=False for optimal training
+    future_price_window = 1 # Use 20 for optimal training
+    num_epochs = 30
+    resample_freq = '1s' # Use '20s' when restore=False for optimal training
     update_freq = float(resample_freq[:-1]) / delay # This is used to tell update_data() to add that many new rows of data before deleting the row with oldest data
     normalization_factor = 1.00 # This is a rescaling factor to create a bigger window for training data set
     symbol = 'ETH-USD'
@@ -864,7 +916,7 @@ if __name__ == '__main__':
     comm = 0.0000  # Market trades are 0.25% or 0.0025
     percent = 0.90  # Choose a value between 0 and 1
     order_valid = data_window#60  # Time allowed for a limit trade order to stay opened
-    restore = False
+    restore = True
     live_trading = False
 
 
@@ -876,7 +928,8 @@ if __name__ == '__main__':
 
     # Read csv file
     # data_rnn = pd.read_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/50_exch_gdax_btcusd_snapshot_20180112/exch_gdax_btcusd_snapshot_20180112.csv')
-    data_rnn = pd.read_csv('C:/Users/Joe/Documents/GitHub/Ethereum/GDAX RNN/exch_gdax_ethusd_snapshot_20180204.csv')
+    data_rnn = pd.read_csv('C:/Users/Joe/Documents/GitHub/Ethereum/exch_gdax_ethusd_snapshot_20170913.csv', nrows=50000)
+    #data_rnn = pd.read_csv('C:/Users/Joe/Documents/GitHub/Ethereum/GDAX RNN/exch_gdax_ethusd_snapshot_20180204.csv')
     # data_rnn = pd.read_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/50_exch_gdax_ltcusd_snapshot_20180112/exch_gdax_ltcusd_snapshot_20180112.csv')
 
     # Provide appropriate ckpt file

@@ -103,7 +103,7 @@ class model_RNN:
         data_rnn['trade_volume_sells_minus_bids'] = data_rnn['trade_volume_sells'] - data_rnn['cumsum_bq1']
         data_rnn['orderbook_market_strength'] = data_rnn['trade_volume_buys_minus_asks'] - data_rnn['trade_volume_sells_minus_bids']
 
-        # data_rnn['orderbook_market_strength_pct_change'] = data_rnn['orderbook_market_strength'].pct_change(periods=self.future_price_window)
+        data_rnn['orderbook_market_strength_pct_change'] = data_rnn['orderbook_market_strength'].pct_change(periods=self.future_price_window)
         data_rnn['trade_px_pct_change'] = data_rnn['trade_px'].pct_change(periods=self.future_price_window)
         data_rnn = data_rnn.drop(data_rnn.head(self.future_price_window).index) # This is to prevent pct_change from producing NaN for loss
 
@@ -252,7 +252,8 @@ class model_RNN:
                 cerebro_data_rnn['low'] = data_rnn_processed['trade_px']
                 cerebro_data_rnn['close'] = data_rnn_processed['trade_px']
                 cerebro_data_rnn['RNN'] = test_pred_list_price_df
-                cerebro_data_rnn.to_csv('C:/Users/Joe/Documents/cerebro_test_all.csv')
+                cerebro_data_rnn.to_csv('C:/Users/Joe/Documents/cerebro_testing.csv')
+                input("Done")
                 # test_pred_list_price_df.to_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/test_pred_list_price_df.csv')
 
             else:
@@ -312,7 +313,7 @@ class model_RNN:
 
     def get_rnn_column_list(self, restore):
         # Pick all apporpriate columns to train and test in RNN
-        rnn_column_list = ['trade_px', 'trade_px_pct_change', 'orderbook_market_strength', 'abratio']
+        rnn_column_list = ['trade_px', 'trade_px_pct_change', 'orderbook_market_strength']
 
         return rnn_column_list
 
@@ -349,8 +350,8 @@ if __name__ == '__main__':
     orderbook_range = 5
     orderbook_window = 1
     future_price_window = 10 # Use 20 for optimal training
-    num_epochs = 50
-    resample_freq = '1s' # Use '20s' when restore=False for optimal training
+    num_epochs = 30
+    resample_freq = '20s' # Use '20s' when restore=False for optimal training
     update_freq = float(resample_freq[:-1]) / delay # This is used to tell update_data() to add that many new rows of data before deleting the row with oldest data
     normalization_factor = 1.00 # This is a rescaling factor to create a bigger window for training data set
     symbol = 'ETH/USD'
@@ -379,7 +380,7 @@ if __name__ == '__main__':
 
     # Provide appropriate ckpt file
     # data_rnn_ckpt = 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/rnn_saved_models/btc_test'
-    data_rnn_ckpt = 'C:/Users/Joe/Documents/GitHub/Ethereum/GDAX RNN/rnn_saved_models/eth_test_all'
+    data_rnn_ckpt = 'C:/Users/Joe/Documents/GitHub/Ethereum/GDAX RNN/rnn_saved_models/eth_cerebro'
     # data_rnn_ckpt = 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/rnn_saved_models/ltc_test'
     # data_rnn_ckpt = 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/rnn_saved_models/test'
 

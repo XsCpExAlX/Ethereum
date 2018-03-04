@@ -41,6 +41,7 @@ class WebsocketClient():
     def message(self, msg):
         if 'side' in msg:
             self.lastMsg = msg
+            
         #print(msg)
 
     def getLastMessage(self):

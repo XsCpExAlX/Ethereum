@@ -1,2 +1,2 @@
-model_checkpoint_path: "30_exch_gdax_ltcusd_snapshot_20180112"
-all_model_checkpoint_paths: "30_exch_gdax_ltcusd_snapshot_20180112"
+model_checkpoint_path: "C:/Users/Joe/Documents/GitHub/Ethereum/GDAX RNN/rnn_saved_models/eth_cerebro1"
+all_model_checkpoint_paths: "C:/Users/Joe/Documents/GitHub/Ethereum/GDAX RNN/rnn_saved_models/eth_cerebro1"

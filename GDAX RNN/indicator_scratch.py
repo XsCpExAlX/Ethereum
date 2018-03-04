@@ -37,7 +37,7 @@ class model_RNN:
 
     def process_data(self, restore, data_rnn, resample_freq=None, normalization_factor=1.2):
         # Drop first two rows and set index to trades_date_time
-        data_rnn = data_rnn.drop(data_rnn.head(2).index)
+        data_rnn = data_rnn.drop(data_rnn.head(10).index)
         data_rnn['trades_date_time'] = pd.to_datetime(data_rnn['trades_date_time'])
         data_rnn = data_rnn[data_rnn.columns.difference(['order_date_time'])]
         data_rnn = data_rnn.set_index('trades_date_time')
@@ -53,7 +53,8 @@ class model_RNN:
         # # Generate trade_volume_buys and trade_volume_sells based on update_type
         data_rnn['trade_volume_buys'] = data_rnn['update_type']
         data_rnn['trade_volume_sells'] = data_rnn['update_type']
-        if data_rnn['update_type'].dtypes == 'float64':
+
+        if True:
             data_rnn['trade_volume_buys'] = data_rnn['trade_volume_buys'].map({1: 1, 2: 0}).multiply(data_rnn['trade_volume'])
             data_rnn['trade_volume_sells'] = data_rnn['trade_volume_sells'].map({1: 0, 2: 1}).multiply(data_rnn['trade_volume'])
         else:
@@ -94,16 +95,15 @@ class model_RNN:
 
         # future_price is purposely calculated after resampling
         if restore:
-            data_rnn = FindSlopes.findPeaks(data_rnn)
             data_rnn['future_price_%s' % (self.future_price_window)] = data_rnn['trade_px']
         else:
-            for i in range(1, self.future_price_window + 1):
-                data_rnn['future_price_%s' % (i)] = data_rnn['trade_px'][::-1].rolling(window=i).mean()[::-1]
+            #for i in range(1, self.future_price_window + 1):
+            data_rnn['future_price_%s' % (self.future_price_window)] = data_rnn['trade_px'][::-1].rolling(window=self.future_price_window).mean()[::-1]
 
 
         # if 'row_num' not in data_rnn.columns: #TODO: add rownum for new incoming data
         data_rnn.insert(0, 'row_num', range(len(data_rnn.index)))  # surrogate for the row number
-
+        data_rnn = data_rnn.drop(data_rnn.tail(self.future_price_window+1).index)
         # Normalize data
         if restore:
             PriceRange = data_rnn['trade_px'].max() - data_rnn['trade_px'].min()
@@ -249,7 +249,7 @@ class model_RNN:
                         test_pred_list_price = test_pred_list[-1]
                         difference = test_pred_list_price - actual_price
 
-                        print('trade_px: %s, yTest_price: %s, test_pred_list_price: %s' % (actual_price), yTest_price, test_pred_list_price)
+                        print('trade_px: %s, yTest_price: %s, test_pred_list_price: %s' % (actual_price, yTest_price, test_pred_list_price))
                         print('Difference: %s' % difference)
 
                         if live_trading:
@@ -848,18 +848,18 @@ if __name__ == '__main__':
     orderbook_range = 5
     orderbook_window = 1
     future_price_window = 10 # Use 20 for optimal training
-    num_epochs = 50
-    resample_freq = '5s' # Use '20s' when restore=False for optimal training
+    num_epochs = 30
+    resample_freq = '20s' # Use '20s' when restore=False for optimal training
     update_freq = float(resample_freq[:-1]) / delay # This is used to tell update_data() to add that many new rows of data before deleting the row with oldest data
     normalization_factor = 1.00 # This is a rescaling factor to create a bigger window for training data set
-    symbol = 'ETH-USD'
+    symbol = 'ETH/USD'
     data_window = int(future_price_window * update_freq) # Use at least 40 to safely avoid len(test_pred_list) = 0
     maperiod1 = 5
     maperiod2 = 20
     comm = 0.0000  # Market trades are 0.25% or 0.0025
     percent = 0.90  # Choose a value between 0 and 1
     order_valid = data_window#60  # Time allowed for a limit trade order to stay opened
-    restore = False
+    restore = True
     live_trading = False
 
 
@@ -871,12 +871,19 @@ if __name__ == '__main__':
 
     # Read csv file
     # data_rnn = pd.read_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/50_exch_gdax_btcusd_snapshot_20180112/exch_gdax_btcusd_snapshot_20180112.csv')
-    data_rnn = pd.read_csv('C:/Users/Joseph/Documents/data/exch_gdax_ethusd_snapshot_20180204.csv')
+    #data_rnn = pd.read_csv('C:/Users/Joseph/Documents/data/exch_gdax_ethusd_snapshot_20180204.csv')
+    data_rnn = pd.read_csv('C:/Users/Joe/Documents/GitHub/Ethereum/GDAX RNN/rnn_saved_models/30_exch_gdax_ethusd_snapshot_20180112/exch_gdax_ethusd_snapshot_20180112.csv')
+    
+#     data_rnn = data_rnn.reindex(index=data_rnn.index[::-1])
+#     data_rnn.to_csv('C:/Users/Joe/Documents/GitHub/Ethereum/exch_gdax_ethusd_snapshot_20170913_reverse.csv')
+
     # data_rnn = pd.read_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/50_exch_gdax_ltcusd_snapshot_20180112/exch_gdax_ltcusd_snapshot_20180112.csv')
 
     # Provide appropriate ckpt file
     # data_rnn_ckpt = 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/rnn_saved_models/btc_test'
-    data_rnn_ckpt = 'C:/Users/Joseph/Documents/data/eth_test'
+    #data_rnn_ckpt = 'C:/Users/Joseph/Documents/data/eth_test_all'
+    data_rnn_ckpt = 'C:/Users/Joe/Documents/GitHub/Ethereum/GDAX RNN/rnn_saved_models/eth_cerebro1'
+
     # data_rnn_ckpt = 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/rnn_saved_models/ltc_test'
     # data_rnn_ckpt = 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/rnn_saved_models/test'
 

@@ -10,6 +10,7 @@ import backtrader as bt
 
 import datetime
 import backtrader.feeds as btfeed
+import pandas as pd
 
 class RNN (bt.feeds.GenericCSVData):
 
@@ -18,7 +19,8 @@ class RNN (bt.feeds.GenericCSVData):
     ('todate', datetime.datetime(2018, 12, 31)),
     ('nullvalue', 0.0),
     ('dtformat', ('%Y-%m-%d %H:%M:%S')),    # Make sure to also change dtformat in csvgeneric.py
-    # ('dtformat', ('%Y%m%d %H:%M:%S.%f')),
+    #('dtformat', ('%Y-%m-%d %H:%M:%S.%f')),
+    #('dtformat', ('%Y%m%d %H:%M:%S.%f')),
     ('tmformat', ('%H.%M:%S')),
 
     ('datetime', 0),
@@ -83,8 +85,7 @@ class TestStrategy(bt.Strategy):
         # Check if an order has been completed
         # Attention: broker could reject order if not enough cash
         if order.status in [order.Completed]:
-            order.executed.value = order.executed.value/order.executed.price*order.created.price
-            order.executed.price = order.created.price
+            #order.executed.value = order.executed.value/order.executed.price*order.created.price
             if order.isbuy():
                 self.log(
                     'BUY EXECUTED, Price: %.2f, Cost: %.2f, Comm %.2f' %
@@ -191,8 +192,9 @@ if __name__ == '__main__':
     # Datas are in a subfolder of the samples. Need to find where the script is
     # because it could have been called from anywhere
     modpath = os.path.dirname(os.path.abspath(sys.argv[0]))
-    datapath = os.path.join(modpath, 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/cerebro_data_rnn_bt.csv')
-
+    #datapath = os.path.join(modpath, 'C:/Users/Joe/Documents/cerebro_test_all.csv')
+    #datapath = os.path.join(modpath, 'C:/Users/Joe/Documents/GitHub/Ethereum/GDAX RNN/cerebro_data_rnn_bt.csv')
+    datapath = (os.path.join(modpath, 'C:/Users/Joe/Documents/cerebro_testing1.csv'))
     # Create a Data Feed
     data = RNN(
             dataname=datapath,
