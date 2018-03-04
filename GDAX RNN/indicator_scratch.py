@@ -8,7 +8,7 @@ import sys
 import time
 import ccxt
 #from bitflyer_real_api import access_key, secret_key
-#from gdax_real_api import real_api_key, real_secret_key, real_passphrase
+from gdax_real_api import real_api_key, real_secret_key, real_passphrase
 import WebsocketClient
 import FindSlopes
 
@@ -54,14 +54,14 @@ class model_RNN:
         data_rnn['trade_volume_buys'] = data_rnn['update_type']
         data_rnn['trade_volume_sells'] = data_rnn['update_type']
 
-        if True:
-            data_rnn['trade_volume_buys'] = data_rnn['trade_volume_buys'].map({1: 1, 2: 0}).multiply(data_rnn['trade_volume'])
-            data_rnn['trade_volume_sells'] = data_rnn['trade_volume_sells'].map({1: 0, 2: 1}).multiply(data_rnn['trade_volume'])
-        else:
+        if data_rnn['update_type'].dtypes not in ['float64', 'int64']:
             data_rnn['trade_volume_buys'] = data_rnn['trade_volume_buys'].map({'buy': 1, 'sell': 0}).multiply(
                 data_rnn['trade_volume'])
             data_rnn['trade_volume_sells'] = data_rnn['trade_volume_sells'].map({'buy': 0, 'sell': 1}).multiply(
                 data_rnn['trade_volume'])
+        else:
+            data_rnn['trade_volume_buys'] = data_rnn['trade_volume_buys'].map({1: 1, 2: 0}).multiply(data_rnn['trade_volume'])
+            data_rnn['trade_volume_sells'] = data_rnn['trade_volume_sells'].map({1: 0, 2: 1}).multiply(data_rnn['trade_volume'])
 
         # Generate dictionary for resampling (or groupby)
         d1 = {'a%s' % (k): ['mean'] for k in range(1, self.orderbook_range + 1)}
@@ -82,7 +82,8 @@ class model_RNN:
         # data_rnn = data_rnn.resample(resample_freq).agg(d1)
         data_rnn = data_rnn.groupby(pd.Grouper(freq=resample_freq)).agg(d1).interpolate(method='time')
         data_rnn.columns = data_rnn.columns.droplevel(level=1)
-
+#         input(data_rnn['trade_volume_buys'])
+#         input(data_rnn['trade_volume_sells'])
         data_rnn['trade_volume_buys_minus_asks'] = data_rnn['trade_volume_buys'] - data_rnn['cumsum_aq1']
         data_rnn['trade_volume_sells_minus_bids'] = data_rnn['trade_volume_sells'] - data_rnn['cumsum_bq1']
         data_rnn['orderbook_market_strength'] = data_rnn['trade_volume_buys_minus_asks'] - data_rnn['trade_volume_sells_minus_bids']
@@ -241,20 +242,20 @@ class model_RNN:
 
                         test_pred_list[:] = [(x * PriceRange) + PriceMean for x in test_pred_list]
                         yTest[:] = [(x * PriceRange) + PriceMean for x in yTest]
-                        yTest = pd.DataFrame({'yTest': yTest.tolist()}) # yTest is converted from numpy-array to dataframe
+                        yTest = pd.DataFrame({'yest': yTest.tolist()}) # yTest is converted from numpy-array to dataframe
                         print('len(test_pred_list): %s, update_count: %s, resample_freq: %s' % (len(test_pred_list), update_count, resample_freq))
                         # actual_price = data_rnn_processed['trade_px'].last().iloc[0].iloc[0]
                         actual_price = data_rnn_processed['trade_px'].tail(1)
                         yTest_price = yTest['yTest'].iloc[-1][0]
                         test_pred_list_price = test_pred_list[-1]
                         difference = test_pred_list_price - actual_price
+                        test_pred_list_df = pd.DataFrame({'predicted_px': test_pred_list})
 
-                        print('trade_px: %s, yTest_price: %s, test_pred_list_price: %s' % (actual_price, yTest_price, test_pred_list_price))
-                        print('Difference: %s' % difference)
+                        print('trade_px: %s, yTest_price: %s, test_pred_list_price: %s, Difference: %s'  % (actual_price, yTest_price, test_pred_list_price, difference))
 
                         if live_trading:
                             position, coin, account_USD, buy_price, sell_price, limit_valid, limit_buy_executed, limit_sell_executed, update_count, percent_increase = self.limit_trade_logic(
-                                exchange, data_rnn, test_pred_list_price, symbol, data_window, maperiod1, maperiod2,
+                                exchange, data_rnn, test_pred_list_df, symbol, data_window, maperiod1, maperiod2,
                                 delay,
                                 position, account_USD,
                                 account_coin, coin, buy_price, sell_price, comm, percent, order_valid=order_valid,
@@ -264,8 +265,8 @@ class model_RNN:
                                 percent_increase=percent_increase)
 
                     time.sleep(delay)
-                    print('Time taken for iteration: ', timer() - start_time)
-                    print('')
+                    #print('Time taken for iteration: ', timer() - start_time)
+                    #print('')
                     # self.plot_predictions(actual_price_df, test_pred_list_price_df, yTest_price_df)
 
             else:
@@ -320,7 +321,7 @@ class model_RNN:
                 test_pred_list_price_df = test_pred_list
                 yTest_price_df = yTest
 
-        self.plot_predictions(actual_price_df, yTest_price_df, test_pred_list_price_df)
+                self.plot_predictions(actual_price_df, yTest_price_df, test_pred_list_price_df)
 
 
     def get_rnn_column_list(self, restore):
@@ -597,7 +598,7 @@ class model_RNN:
         order_side = exchange.fetch_orders(symbol)[0]['side']
 
         # Make a flash crash segment!!!!!!! if temp_sell_price <= 0.8 * sell_price
-        # Make a flash crash segment!!!!!!!
+        # Make a flash crash segment!!!!!!! if bought price > 10% current price?
         # Make a flash crash segment!!!!!!!
 
         if (exchange.fetch_orders(symbol) == []):
@@ -637,40 +638,12 @@ class model_RNN:
                             account_USD = float('{0:2f}'.format(exchange.fetch_balance()['total'][usd]))
                             percent_increase = (100 * (account_USD - start_account) / start_account)
                             print(
-                                'LIMIT SELL EXECUTED, Price = %.2f, Comm = %.4f, Account = %.2f, Percent Increase = %.2f' % (
+                                "LIMIT SELL EXECUTED, Price = %.2f, Comm = %.4f, Account = %.2f, Percent Increase = %s" % (
                                 float('{0:2f}'.format(sell_price)), comm, account_USD,
                                 float('{0:2f}'.format(percent_increase))))
                             limit_valid = 0
                             update_count = -1
-                        elif (temp_sell_price < sell_price):
-                            position = False
-                            limit_buy_executed = False
-                            try:
-                                exchange.cancel_order(exchange.fetch_orders(symbol)[0]['id'], symbol)
-                                if update_count < 3:
-                                    print('LIMIT SELL CANCELED but')
-                                    sell_price = temp_sell_price
-                                    coin = float('{0:8f}'.format(exchange.fetch_balance()['total'][coin_symbol]))
-                                    exchange.create_order(symbol, type='limit', side='sell', amount=coin,
-                                                          post_only=True,
-                                                          price=float('{0:2f}'.format(sell_price)))
-                                    print(
-                                        'UPDATED LIMIT SELL CREATED, Price = %.2f' % float('{0:2f}'.format(sell_price)))
-                                    update_count += 1
-                                else:
-                                    print('LIMIT SELL CANCELED AND NO LONGER UPDATED UNTIL NEXT INDICATOR SIGNAL')
-                                    position = True
-                                    limit_buy_executed = True
-                                    update_count = -1
-                            except:
-                                e = sys.exc_info()[0]
-                                print('Error: %s' % e)
-                                position = True
-                                limit_buy_executed = True
-                                update_count = -1
-                                pass
 
-                            limit_valid = 0
                     elif (limit_valid >= order_valid and order_side == 'sell' and (order_status == 'open' or order_status == 'rejected')):
                         try:
                             # account_USD = float('{0:2f}'.format(exchange.fetch_balance()['total'][usd]))
@@ -695,7 +668,7 @@ class model_RNN:
                     limit_buy_executed = False
                     limit_sell_executed = False
                     update_count = 0
-                    buy_price = exchange.fetch_order_book(symbol)['bids'][0][0]
+                    buy_price = exchange.fetch_order_book(symbol)['bids'][0][0] - 0.10
                     # account_USD = exchange.fetch_balance()['total'][usd]  # Only use this line when making real trades
 
                 # if (spread == 0.01):
@@ -728,34 +701,6 @@ class model_RNN:
                             float('{0:2f}'.format(buy_price)), account_USD))
                             limit_valid = 0
                             update_count = -1
-                        elif (temp_buy_price > buy_price):
-                            position = True
-                            limit_sell_executed = False
-                            try:
-                                exchange.cancel_order(exchange.fetch_orders(symbol)[0]['id'], symbol)
-                                if update_count < 3:
-                                    print('LIMIT BUY CANCELED but')
-                                    buy_price = temp_buy_price
-                                    # account_USD = float('{0:2f}'.format(exchange.fetch_balance()['total'][usd]))
-                                    coin = float('{0:8f}'.format(percent * account_USD / buy_price))
-                                    exchange.create_order(symbol, type='limit', side='buy', amount=coin, post_only=True,
-                                                          price=float('{0:2f}'.format(buy_price)))
-                                    print('UPDATED LIMIT BUY CREATED, Price = %.2f' % float('{0:2f}'.format(buy_price)))
-                                    update_count += 1
-                                else:
-                                    print('LIMIT BUY CANCELED AND NO LONGER UPDATED UNTIL NEXT INDICATOR SIGNAL')
-                                    position = False
-                                    limit_sell_executed = True
-                                    update_count = -1
-                            except:
-                                e = sys.exc_info()[0]
-                                print('Error: %s' % e)
-                                position=False
-                                limit_sell_executed = True
-                                update_count = -1
-                                pass
-
-                            limit_valid = 0
                     elif (limit_valid >= order_valid and order_side == 'buy' and (order_status == 'open' or order_status == 'rejected')):
                         try:
                             # account_USD = float('{0:2f}'.format(exchange.fetch_balance()['total'][usd]))
@@ -774,7 +719,7 @@ class model_RNN:
                             pass
                 elif (ema1_minus_sma2 > 0 and ema1_minus_predicted_px < 0 and limit_buy_executed == True and update_count == -1):
                 # elif (ema1_minus_sma2 < 0 and ema1_minus_predicted_px > 0 and limit_buy_executed == True and update_count == -1):
-                    sell_price = exchange.fetch_order_book(symbol)['asks'][0][0]
+                    sell_price = exchange.fetch_order_book(symbol)['asks'][0][0] + 0.09
                     coin = exchange.fetch_balance()['total'][coin_symbol]
                     position = False
                     limit_buy_executed = False
@@ -817,7 +762,7 @@ class model_RNN:
         elif order == 'limit':
             rnn_length = len(indicator_data_rnn['predicted_px'])
             ema1 = \
-            indicator_data_rnn['predicted_px'].iloc[[-maperiod1 - 1, -1]].ewm(span=maperiod1).mean().iloc[-1]
+            indicator_data_rnn['predicted_px'].iloc[[-maperiod1 -1, -1]].ewm(span=maperiod1).mean().iloc[-1]
             sma2 = indicator_data_rnn['predicted_px'].iloc[-maperiod2 - 1].mean()
             ema1_minus_sma2 = ema1 - sma2
             ema1_minus_predicted_px = ema1 - indicator_data_rnn['predicted_px'].iloc[-1]
@@ -835,13 +780,13 @@ class model_RNN:
 
 if __name__ == '__main__':
     # Instantiate real gdax api to get live data feed
-#     trade_exch = ccxt.gdax({'apiKey': real_api_key,
-#                             'secret': real_secret_key,
-#                             'password': real_passphrase,
-#                             'nonce': ccxt.gdax.seconds,
-#                             'verbose': False})  # If verbose is True, log HTTP requests
-    trade_exch = ccxt.gdax()
-    trade_exch.urls['api'] = 'https://api.gdax.com'
+    trade_exch = ccxt.gdax({'apiKey': real_api_key,
+                            'secret': real_secret_key,
+                            'password': real_passphrase,
+                            'nonce': ccxt.gdax.seconds,
+                            'verbose': False})  # If verbose is True, log HTTP requests
+#     trade_exch = ccxt.gdax()
+#     trade_exch.urls['api'] = 'https://api.gdax.com'
 
     # Trading parameters
     delay = 1
@@ -860,7 +805,7 @@ if __name__ == '__main__':
     percent = 0.90  # Choose a value between 0 and 1
     order_valid = data_window#60  # Time allowed for a limit trade order to stay opened
     restore = True
-    live_trading = False
+    live_trading = True
 
 
     print('Loading %s Market...' % symbol)
@@ -872,7 +817,7 @@ if __name__ == '__main__':
     # Read csv file
     # data_rnn = pd.read_csv('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/50_exch_gdax_btcusd_snapshot_20180112/exch_gdax_btcusd_snapshot_20180112.csv')
     #data_rnn = pd.read_csv('C:/Users/Joseph/Documents/data/exch_gdax_ethusd_snapshot_20180204.csv')
-    data_rnn = pd.read_csv('C:/Users/Joe/Documents/GitHub/Ethereum/GDAX RNN/rnn_saved_models/30_exch_gdax_ethusd_snapshot_20180112/exch_gdax_ethusd_snapshot_20180112.csv')
+    #data_rnn = pd.read_csv('C:/Users/Joe/Documents/GitHub/Ethereum/GDAX RNN/rnn_saved_models/30_exch_gdax_ethusd_snapshot_20180112/exch_gdax_ethusd_snapshot_20180112.csv', nrows=2000)
     
 #     data_rnn = data_rnn.reindex(index=data_rnn.index[::-1])
 #     data_rnn.to_csv('C:/Users/Joe/Documents/GitHub/Ethereum/exch_gdax_ethusd_snapshot_20170913_reverse.csv')
@@ -891,10 +836,13 @@ if __name__ == '__main__':
     tf.reset_default_graph()
     #x.ws = WebsocketClient.WebsocketClient(product_id = 'ETH-USD', channel = "ticker")
     #data_rnn, trade_id = x.preloadData(data_window, delay, trade_exch, symbol)
+    #data_rnn.to_csv('C:/Users/Joe/Documents/preload_data.csv')
+    data_rnn = pd.read_csv('C:/Users/Joe/Documents/preload_data.csv')
 
     # Process Data
     x.train_and_predict(restore=restore, live_trading=live_trading, data_rnn=data_rnn, data_rnn_ckpt=data_rnn_ckpt, resample_freq=resample_freq,
-                        update_freq=update_freq, normalization_factor=normalization_factor, exchange=trade_exch, symbol=symbol, delay=delay)
+                        update_freq=update_freq, normalization_factor=normalization_factor, exchange=trade_exch, symbol=symbol, delay=delay,
+                        maperiod1=maperiod1, maperiod2=maperiod2, order_valid=order_valid, comm = comm)
 
     # Testing indicators
     # x.process_data(restore, data_rnn, resample_freq=resample_freq)
