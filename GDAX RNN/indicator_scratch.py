@@ -214,6 +214,7 @@ class model_RNN:
 
                 while True:
                     updated, updated_data_rnn, updateData_count = self.updateData(exchange, data_rnn, symbol, updateData_count)
+                    updated_data_rnn.to_csv('/home/ec2-user/Ethereum/GDAX RNN/preload_data.csv') 
 
                     if updated:
                         data_rnn = updated_data_rnn
@@ -240,7 +241,7 @@ class model_RNN:
 
                         test_pred_list[:] = [(x * PriceRange) + PriceMean for x in test_pred_list]
                         yTest[:] = [(x * PriceRange) + PriceMean for x in yTest]
-                        yTest = pd.DataFrame({'yest': yTest.tolist()}) # yTest is converted from numpy-array to dataframe
+                        yTest = pd.DataFrame({'yTest': yTest.tolist()}) # yTest is converted from numpy-array to dataframe
                         print('len(test_pred_list): %s, update_logic_count: %s, resample_freq: %s' % (len(test_pred_list), update_logic_count, resample_freq))
                         # actual_price = data_rnn_processed['trade_px'].last().iloc[0].iloc[0]
                         actual_price = data_rnn_processed['trade_px'].tail(1)
@@ -248,8 +249,7 @@ class model_RNN:
                         test_pred_list_price = test_pred_list[-1]
                         difference = test_pred_list_price - actual_price
                         test_pred_list_df = pd.DataFrame({'predicted_px': test_pred_list})
-
-                        print('trade_px: %s, yTest_price: %s, test_pred_list_price: %s, Difference: %s'  % (actual_price, yTest_price, test_pred_list_price, difference))
+                        print('trade_px: %s, yTest_price: %s, test_pred_list_price: %s, Difference: %s'  % (actual_price, yTest_price,  test_pred_list_price, difference))
 
                         position, coin, account_USD, buy_price, sell_price, limit_valid, limit_buy_executed, limit_sell_executed, update_logic_count, percent_increase = self.limit_trade_logic(
                             exchange, data_rnn, test_pred_list_df, symbol, data_window, maperiod1, maperiod2,
@@ -307,7 +307,6 @@ class model_RNN:
                         print('trade_px: %s, yTest_price: %s, test_pred_list_price: %s, Difference: %s'  % (actual_price, yTest_price, test_pred_list_price, difference))
 
                     time.sleep(delay)
-
 
             else:
                 for epoch_idx in range(self.num_epochs):
@@ -708,7 +707,7 @@ class model_RNN:
                     limit_sell_executed = False
                     update_logic_count = 0
                     buy_price = exchange.fetch_order_book(symbol)['bids'][0][0] - 0.10
-                    # account_USD = exchange.fetch_balance()['total'][usd]  # Only use this line when making real trades
+                    account_USD = exchange.fetch_balance()['total'][usd]  # Only use this line when making real trades
 
                 # if (spread == 0.01):
                     #     buy_price = new_data_rnn['b1'][data_window - 1] # Limit buy price will be the first bid price
@@ -865,22 +864,23 @@ if __name__ == '__main__':
     # Provide appropriate ckpt file
     # data_rnn_ckpt = 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/rnn_saved_models/btc_test'
     #data_rnn_ckpt = 'C:/Users/Joseph/Documents/data/eth_test_all'
-    data_rnn_ckpt = 'C:/Users/Joe/Documents/GitHub/Ethereum/GDAX RNN/rnn_saved_models/eth_cerebro1'
+    data_rnn_ckpt = '/home/ec2-user/Ethereum/GDAX RNN/rnn_saved_models/eth_cerebro1'
 
     # data_rnn_ckpt = 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/rnn_saved_models/ltc_test'
     # data_rnn_ckpt = 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/rnn_saved_models/test'
 
-
     tf.reset_default_graph()
-    #x.ws = WebsocketClient.WebsocketClient(product_id = 'ETH-USD', channel = "ticker")
-    #data_rnn, trade_id = x.preloadData(data_window, delay, trade_exch, symbol)
-    #data_rnn.to_csv('C:/Users/Joe/Documents/preload_data.csv')
-    data_rnn = pd.read_csv('C:/Users/Joe/Documents/preload_data.csv')
+    if os.path.isfile('/home/ec2-user/Ethereum/GDAX RNN/preload_data.csv'):
+        data_rnn = pd.read_csv('/home/ec2-user/Ethereum/GDAX RNN/preload_data.csv')
+    else:
+        #x.ws = WebsocketClient.WebsocketClient(product_id = 'ETH-USD', channel = "ticker")
+        data_rnn, trade_id = x.preloadData(data_window, delay, trade_exch, symbol)
+        data_rnn.to_csv('/home/ec2-user/Ethereum/GDAX RNN/preload_data.csv')
 
     # Process Data
     x.train_and_predict(restore=restore, live_trading=live_trading, data_rnn=data_rnn, data_rnn_ckpt=data_rnn_ckpt, resample_freq=resample_freq,
                         update_freq=update_freq, normalization_factor=normalization_factor, exchange=trade_exch, symbol=symbol, delay=delay,
-                        maperiod1=maperiod1, maperiod2=maperiod2, order_valid=order_valid, comm = comm)
+                        maperiod1=maperiod1, maperiod2=maperiod2, order_valid=order_valid, comm=comm, percent=percent)
 
     # Testing indicators
     # x.process_data(restore, data_rnn, resample_freq=resample_freq)

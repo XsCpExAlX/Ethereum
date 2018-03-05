@@ -1,0 +1,6 @@
+#!/bin/bash
+while ! python indicator_scratch.py
+do
+  sleep 1
+  echo "Restarting program..."
+done
