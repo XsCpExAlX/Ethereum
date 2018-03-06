@@ -214,7 +214,7 @@ class model_RNN:
 
                 while True:
                     updated, updated_data_rnn, updateData_count = self.updateData(exchange, data_rnn, symbol, updateData_count)
-                    updated_data_rnn.to_csv('C:/Users/Joe/Documents/GitHub/Ethereum/GDAX RNN/preload_data.csv', index=False, mode='w+')
+                    updated_data_rnn.to_csv('/home/ec2-user/Ethereum/GDAX RNN/preload_data.csv', index=False, mode='w+')
 
                     if updated:
                         data_rnn = updated_data_rnn
@@ -636,7 +636,6 @@ class model_RNN:
         # print('a1 = %.2f, b1 = %.2f, spread = %.2f' % (a1, b1, spread))
         order_status = exchange.fetch_orders(symbol)[0]['status']
         order_side = exchange.fetch_orders(symbol)[0]['side']
-
         # Make a flash crash segment!!!!!!! if temp_sell_price <= 0.8 * sell_price
         # Make a flash crash segment!!!!!!! if bought price > 10% current price?
         # Make a flash crash segment!!!!!!!
@@ -766,7 +765,7 @@ class model_RNN:
                     #     sell_price = new_data_rnn['a1'][data_window - 1]  # Limit sell price will be the first ask price
                     # else:
                     #     buy_price = new_data_rnn['a1'][data_window - 1] - 0.01  # Limit sell price will supercede first ask price
-                    exchange.create_order(symbol, type='limit', side='sell', amount=coin, post_only=True,
+                    exchange.create_order(symbol, type='limit', side='sell', amount=coin, params={post_only=True},
                                           price=sell_price)
                     account_USD = float('{0:2f}'.format(exchange.fetch_balance()['total'][usd]))
                     print('LIMIT SELL CREATED, Price = %.2f' % float('{0:2f}'.format(sell_price)))
@@ -864,18 +863,18 @@ if __name__ == '__main__':
     # Provide appropriate ckpt file
     # data_rnn_ckpt = 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/rnn_saved_models/btc_test'
     #data_rnn_ckpt = 'C:/Users/Joseph/Documents/data/eth_test_all'
-    data_rnn_ckpt = 'C:/Users/Joe/Documents/GitHub/Ethereum/GDAX RNN/rnn_saved_models/eth_cerebro1'
+    data_rnn_ckpt = '/home/ec2-user/Ethereum/GDAX RNN/rnn_saved_models/eth_cerebro1'
 
     # data_rnn_ckpt = 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/rnn_saved_models/ltc_test'
     # data_rnn_ckpt = 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/rnn_saved_models/test'
 
     tf.reset_default_graph()
-    if os.path.isfile('C:/Users/Joe/Documents/GitHub/Ethereum/GDAX RNN/preload_data.csv'):
-        data_rnn = pd.read_csv('C:/Users/Joe/Documents/GitHub//Ethereum/GDAX RNN/preload_data.csv')
+    if os.path.isfile('/home/ec2-user/Ethereum/GDAX RNN/preload_data.csv'):
+        data_rnn = pd.read_csv('/home/ec2-user/Ethereum/GDAX RNN/preload_data.csv')
     else:
         #x.ws = WebsocketClient.WebsocketClient(product_id = 'ETH-USD', channel = "ticker")
         data_rnn, trade_id = x.preloadData(data_window, delay, trade_exch, symbol)
-        data_rnn.to_csv('C:/Users/Joe/Documents/GitHub/Ethereum/GDAX RNN/preload_data.csv',index=False, mode='w+')
+        data_rnn.to_csv('/home/ec2-user/Ethereum/GDAX RNN/preload_data.csv',index=False, mode='w+')
 
     # Process Data
     x.train_and_predict(restore=restore, live_trading=live_trading, data_rnn=data_rnn, data_rnn_ckpt=data_rnn_ckpt, resample_freq=resample_freq,
