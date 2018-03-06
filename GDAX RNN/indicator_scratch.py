@@ -213,6 +213,7 @@ class model_RNN:
                     exchange, data_rnn, symbol, data_window)
 
                 while True:
+                    #updated, updated_data_rnn = self.updateDataWS(exchange, data_rnn, symbol)
                     updated, updated_data_rnn, updateData_count = self.updateData(exchange, data_rnn, symbol, updateData_count)
                     updated_data_rnn.to_csv('/home/ec2-user/Ethereum/GDAX RNN/preload_data.csv', index=False, mode='w+')
 
@@ -243,6 +244,7 @@ class model_RNN:
                         yTest[:] = [(x * PriceRange) + PriceMean for x in yTest]
                         yTest = pd.DataFrame({'yTest': yTest.tolist()}) # yTest is converted from numpy-array to dataframe
                         print('len(test_pred_list): %s, updateData_count: %s, resample_freq: %s' % (len(test_pred_list), updateData_count, resample_freq))
+                        
                         # actual_price = data_rnn_processed['trade_px'].last().iloc[0].iloc[0]
                         actual_price = data_rnn['trade_px'].iloc[-1]
                         yTest_price = yTest['yTest'].iloc[-1][0]
@@ -404,7 +406,8 @@ class model_RNN:
         if new_trade_id != self.last_trade_id:
             if updateData_count % update_freq == 0:
                 data_rnn = data_rnn.drop(data_rnn.head(updateData_count).index)
-                updateData_count = 0
+                print(len(data_rnn))
+		updateData_count = 0
             data_rnn = pd.concat([data_rnn, new_data_rnn])
             data_rnn = data_rnn.reset_index(drop=True)
             updateData_count += 1
@@ -765,7 +768,7 @@ class model_RNN:
                     #     sell_price = new_data_rnn['a1'][data_window - 1]  # Limit sell price will be the first ask price
                     # else:
                     #     buy_price = new_data_rnn['a1'][data_window - 1] - 0.01  # Limit sell price will supercede first ask price
-                    exchange.create_order(symbol, type='limit', side='sell', amount=coin, params={post_only=True},
+                    exchange.create_order(symbol, type='limit', side='sell', amount=coin, params={'post_only':True},
                                           price=sell_price)
                     account_USD = float('{0:2f}'.format(exchange.fetch_balance()['total'][usd]))
                     print('LIMIT SELL CREATED, Price = %.2f' % float('{0:2f}'.format(sell_price)))
@@ -869,10 +872,10 @@ if __name__ == '__main__':
     # data_rnn_ckpt = 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/rnn_saved_models/test'
 
     tf.reset_default_graph()
+    #x.ws = WebsocketClient.WebsocketClient(product_id = 'ETH-USD', channel = "ticker")
     if os.path.isfile('/home/ec2-user/Ethereum/GDAX RNN/preload_data.csv'):
         data_rnn = pd.read_csv('/home/ec2-user/Ethereum/GDAX RNN/preload_data.csv')
     else:
-        #x.ws = WebsocketClient.WebsocketClient(product_id = 'ETH-USD', channel = "ticker")
         data_rnn, trade_id = x.preloadData(data_window, delay, trade_exch, symbol)
         data_rnn.to_csv('/home/ec2-user/Ethereum/GDAX RNN/preload_data.csv',index=False, mode='w+')
 
