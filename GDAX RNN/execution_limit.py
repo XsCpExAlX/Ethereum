@@ -4,13 +4,13 @@ from __future__ import (absolute_import, division, print_function,
 import datetime  # For datetime objects
 import os.path  # To manage paths
 import sys  # To find out the script name (in argv[0])
+import csv
 
 # Import the backtrader platform
 import backtrader as bt
 
 import datetime
 import backtrader.feeds as btfeed
-import pandas as pd
 
 class RNN (bt.feeds.GenericCSVData):
 
@@ -19,8 +19,7 @@ class RNN (bt.feeds.GenericCSVData):
     ('todate', datetime.datetime(2018, 12, 31)),
     ('nullvalue', 0.0),
     ('dtformat', ('%Y-%m-%d %H:%M:%S')),    # Make sure to also change dtformat in csvgeneric.py
-    #('dtformat', ('%Y-%m-%d %H:%M:%S.%f')),
-    #('dtformat', ('%Y%m%d %H:%M:%S.%f')),
+    # ('dtformat', ('%Y%m%d %H:%M:%S.%f')),
     ('tmformat', ('%H.%M:%S')),
 
     ('datetime', 0),
@@ -77,6 +76,10 @@ class TestStrategy(bt.Strategy):
         # bt.indicators.SmoothedMovingAverage(rsi, period=10)
         # bt.indicators.ATR(self.datas[0], plot=False)
 
+        # f = open('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/cerebro_data_rnn_log.csv', 'w')
+        # f.write('')
+        # f.close()
+
     def notify_order(self, order):
         if order.status in [order.Submitted, order.Accepted]:
             # Buy/Sell order submitted/accepted to/by broker - Nothing to do
@@ -85,7 +88,6 @@ class TestStrategy(bt.Strategy):
         # Check if an order has been completed
         # Attention: broker could reject order if not enough cash
         if order.status in [order.Completed]:
-            #order.executed.value = order.executed.value/order.executed.price*order.created.price
             if order.isbuy():
                 self.log(
                     'BUY EXECUTED, Price: %.2f, Cost: %.2f, Comm %.2f' %
@@ -96,6 +98,14 @@ class TestStrategy(bt.Strategy):
                 self.buycomm = order.executed.comm
                 self.bar_executed = len(self)
 
+                f = open('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/cerebro_data_rnn_log.csv', 'a')
+                f.write('%s, BUY EXECUTED, Price: %.2f, Cost: %.2f, Comm %.2f\n' %
+                    (self.datas[0].datetime.datetime(0),
+                     order.executed.price,
+                     order.executed.value,
+                     order.executed.comm))
+                f.close()
+
             else:  # Sell
                 self.log('SELL EXECUTED, Price: %.2f, Cost: %.2f, Comm %.2f' %
                          (order.executed.price,
@@ -103,8 +113,22 @@ class TestStrategy(bt.Strategy):
                           order.executed.comm))
                 self.bar_executed = len(self)
 
+                f = open('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/cerebro_data_rnn_log.csv',
+                         'a')
+                f.write('%s, SELL EXECUTED, Price: %.2f, Cost: %.2f, Comm %.2f\n' %
+                         (self.datas[0].datetime.datetime(0),
+                          order.executed.price,
+                          order.executed.value,
+                          order.executed.comm))
+                f.close()
+
         if order.status in [order.Canceled, order.Margin, order.Rejected]:
             self.log('Order Canceled/Margin/Rejected')
+
+            f = open('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/cerebro_data_rnn_log.csv',
+                     'a')
+            f.write('%s, Order Canceled/Margin/Rejected\n' % self.datas[0].datetime.datetime(0))
+            f.close()
 
         # Write down: no pending order
         self.order = None
@@ -115,6 +139,12 @@ class TestStrategy(bt.Strategy):
 
         self.log('OPERATION PROFIT, GROSS %.2f, NET %.2f' %
                  (trade.pnl, trade.pnlcomm))
+
+        f = open('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/cerebro_data_rnn_log.csv',
+                 'a')
+        f.write('%s, OPERATION PROFIT, GROSS %.2f, NET %.2f\n' %
+                 (self.datas[0].datetime.datetime(0), trade.pnl, trade.pnlcomm))
+        f.close()
 
     def next(self):
         # Simply log the closing price of the series from the reference
@@ -135,6 +165,11 @@ class TestStrategy(bt.Strategy):
                 self.order = self.buy(exectype=bt.Order.Limit,
                                       price=self.dataclose[0] - 0.10,
                                       valid=datetime.timedelta(minutes=2))
+
+                # f = open('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/cerebro_data_rnn_log.csv',
+                #          'a')
+                # f.write('%s, BUY CREATE, %.2f\n' % (self.datas[0].datetime.datetime(0), self.dataclose[0] - 0.10))
+                # f.close()
                 # if (self.dataRNN[0] <= self.dataclose[0]):
                 #     self.log('BUY CREATE, %.2f' % self.dataRNN[0])
                 #     # self.log('BUY CREATE, %.2f' % self.dataclose[0])
@@ -164,6 +199,11 @@ class TestStrategy(bt.Strategy):
                 self.order = self.sell(exectype=bt.Order.Limit,
                                        price=self.dataclose[0] + 0.09,
                                        valid=datetime.timedelta(minutes=2))
+
+                # f = open('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/cerebro_data_rnn_log.csv',
+                #          'a')
+                # f.write('%s, SELL CREATE, %.2f\n' % (self.datas[0].datetime.datetime(0), self.dataclose[0] + 0.09))
+                # f.close()
                 # if (self.dataRNN[0] >= self.dataclose[0]):
                 #     self.log('SELL CREATE, %.2f' % self.dataRNN[0])
                 #
@@ -192,9 +232,9 @@ if __name__ == '__main__':
     # Datas are in a subfolder of the samples. Need to find where the script is
     # because it could have been called from anywhere
     modpath = os.path.dirname(os.path.abspath(sys.argv[0]))
-    #datapath = os.path.join(modpath, 'C:/Users/Joe/Documents/cerebro_test_all.csv')
-    #datapath = os.path.join(modpath, 'C:/Users/Joe/Documents/GitHub/Ethereum/GDAX RNN/cerebro_data_rnn_bt.csv')
-    datapath = (os.path.join(modpath, 'C:/Users/Joe/Documents/cerebro_testing1.csv'))
+    datapath = os.path.join(modpath, 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/cerebro_data_rnn_bt.csv')
+    # datapath = os.path.join(modpath, 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/ETHUSD_RNN10_bt_reverse.csv')
+
     # Create a Data Feed
     data = RNN(
             dataname=datapath,
@@ -214,20 +254,28 @@ if __name__ == '__main__':
     cerebro.broker.setcash(10000.00)
 
     # Add a FixedSize sizer according to the stake
-    cerebro.addsizer(bt.sizers.PercentSizer, percents=90)
+    # cerebro.addsizer(bt.sizers.PercentSizer, percents=90)
+    cerebro.addsizer(bt.sizers.FixedSize, stake=20)
 
     # Set the commission (limit order is 0.0000)
     cerebro.broker.setcommission(commission=0.0000)
 
     # Print out the starting conditions
     print('Starting Portfolio Value: %.2f' % cerebro.broker.getvalue())
+    f = open('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/cerebro_data_rnn_log.csv',
+             'w')
+    f.write('Starting Portfolio Value: %.2f\n' % cerebro.broker.getvalue())
+    f.close()
 
     # Run over everything
     cerebro.run()
 
     # Print out the final result
     print('Final Portfolio Value: %.2f' % cerebro.broker.getvalue())
-
+    f = open('C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/cerebro_data_rnn_log.csv',
+             'a')
+    f.write('Final Portfolio Value: %.2f' % cerebro.broker.getvalue())
+    f.close()
     # Plot the result
     cerebro.plot()
 
