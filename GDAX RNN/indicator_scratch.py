@@ -22,7 +22,6 @@ import matplotlib.pyplot as plt
 import decimal
 from timeit import default_timer as timer
 
-
 class model_RNN:
     last_trade_id = 0
     last_trade_price = 0
@@ -33,7 +32,6 @@ class model_RNN:
         self.orderbook_window = orderbook_window
         self.future_price_window = future_price_window
         self.num_epochs = num_epochs
-
 
     def process_data(self, restore, data_rnn, resample_freq=None, normalization_factor=1.2):
         # Drop first two rows and set index to trades_date_time
@@ -252,7 +250,9 @@ class model_RNN:
                         difference = test_pred_list_price - actual_price
                         test_pred_list_df = pd.DataFrame({'predicted_px': test_pred_list})
                         print('trade_px: %s, yTest_price: %s, test_pred_list_price: %s, Difference: %s'  % (actual_price, yTest_price,  test_pred_list_price, difference))
-
+			pricelog = pd.DataFrame(columns=['time','actual_px','yTest','predicted'])
+			pricelog = pricelog.append({'time':str(datetime.now()),'actual_px':actual_price,'yTest':yTest_price,'predicted':test_pred_list_price},ignore_index=True)
+			pricelog.to_csv('/home/ec2-user/logs.csv',mode='a',index=False)
                         position, coin, account_USD, buy_price, sell_price, limit_valid, limit_buy_executed, limit_sell_executed, update_logic_count, percent_increase = self.limit_trade_logic(
                             exchange, data_rnn, test_pred_list_df, symbol, data_window, maperiod1, maperiod2,
                             delay,
@@ -709,7 +709,7 @@ class model_RNN:
                     limit_buy_executed = False
                     limit_sell_executed = False
                     update_logic_count = 0
-                    buy_price = exchange.fetch_order_book(symbol)['bids'][0][0] - 0.10
+                    buy_price = exchange.fetch_order_book(symbol)['bids'][0][0] - 0.03
                     account_USD = exchange.fetch_balance()['total'][usd]  # Only use this line when making real trades
 
                 # if (spread == 0.01):
@@ -758,7 +758,7 @@ class model_RNN:
                             pass
                 elif (ema1_minus_sma2 > 0 and ema1_minus_predicted_px < 0 and limit_buy_executed == True and update_logic_count == -1):
                 # elif (ema1_minus_sma2 < 0 and ema1_minus_predicted_px > 0 and limit_buy_executed == True and update_logic_count == -1):
-                    sell_price = exchange.fetch_order_book(symbol)['asks'][0][0] + 0.09
+                    sell_price = exchange.fetch_order_book(symbol)['asks'][0][0] + 0.02
                     coin = exchange.fetch_balance()['total'][coin_symbol]
                     position = False
                     limit_buy_executed = False
@@ -837,7 +837,7 @@ if __name__ == '__main__':
     update_freq = float(resample_freq[:-1]) / delay # This is used to tell update_data() to add that many new rows of data before deleting the row with oldest data
     normalization_factor = 1.00 # This is a rescaling factor to create a bigger window for training data set
     symbol = 'ETH/USD'
-    data_window = int(future_price_window * update_freq) # Use at least 40 to safely avoid len(test_pred_list) = 0
+    data_window = int(future_price_window * update_freq * 1.5) # Use at least 40 to safely avoid len(test_pred_list) = 0
     maperiod1 = 5
     maperiod2 = 20
     comm = 0.0000  # Market trades are 0.25% or 0.0025
@@ -876,7 +876,7 @@ if __name__ == '__main__':
     if os.path.isfile('/home/ec2-user/Ethereum/GDAX RNN/preload_data.csv'):
         data_rnn = pd.read_csv('/home/ec2-user/Ethereum/GDAX RNN/preload_data.csv')
     else:
-        data_rnn, trade_id = x.preloadData(data_window, delay, trade_exch, symbol)
+        data_rnn, trade_id = x.preloadData(data_window+1, delay, trade_exch, symbol)
         data_rnn.to_csv('/home/ec2-user/Ethereum/GDAX RNN/preload_data.csv',index=False, mode='w+')
 
     # Process Data
