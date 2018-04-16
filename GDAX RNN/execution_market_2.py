@@ -37,8 +37,8 @@ class RNN (bt.feeds.GenericCSVData):
 # Create a Stratey
 class TestStrategy(bt.Strategy):
     params = (
-        ('maperiod1', 50),  # maperiod1=5 if no repeats (5 * 10)
-        ('maperiod2', 200), # maperiod2=200 if no repeats (20 * 10)
+        ('maperiod1', 20),  # maperiod1=5 if no repeats (5 * 10)
+        ('maperiod2', 300), # maperiod2=200 if no repeats (20 * 10)
     )
 
     def log(self, txt, dt=None):
@@ -69,8 +69,8 @@ class TestStrategy(bt.Strategy):
 
         # bt.indicators.WeightedMovingAverage(self.datas[0], period=25,
         #                                     subplot=True)
-        # bt.indicators.StochasticSlow(self.datas[0])
-        # bt.indicators.MACDHisto(self.datas[0])
+        # self.stochastic = bt.indicators.StochasticSlow(self.datas[0])
+        # self.MACD = bt.indicators.MACDHisto(self.datas[0])
         # rsi = bt.indicators.RSI(self.datas[0])
         # bt.indicators.SmoothedMovingAverage(rsi, period=10)
         # bt.indicators.ATR(self.datas[0], plot=False)
@@ -158,7 +158,8 @@ if __name__ == '__main__':
     # Datas are in a subfolder of the samples. Need to find where the script is
     # because it could have been called from anywhere
     modpath = os.path.dirname(os.path.abspath(sys.argv[0]))
-    datapath = os.path.join(modpath, 'C:/Users/Joseph/Documents/GitHub/Ethereum/GDAX RNN/ETHUSD_RNN10_bt.csv')
+    # datapath = os.path.join(modpath, 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/bitflyer_BTCUSD_TRADEDATA_120517_bt_datetime.csv')
+    datapath = os.path.join(modpath, 'C:/Users/donut/PycharmProjects/backtrader/backtrader-master/datas/BTCUSD_RNN3_bt.csv')
 
     # Create a Data Feed
     data = RNN(
